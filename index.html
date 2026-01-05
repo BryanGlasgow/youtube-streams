@@ -54,10 +54,10 @@
 
 <body>
 
-<h2>Upcoming livestreams</h2>
+<h3>Upcoming Events</h3>
 <div id="upcoming" class="stream-list"></div>
 
-<h2>Past livestreams</h2>
+<h3>Past Events</h3>
 <div id="past" class="stream-list"></div>
 
 <script>
@@ -108,7 +108,7 @@ async function fetchStreams(eventType, containerId) {
 
   const container = document.getElementById(containerId);
   if (!data.items || data.items.length === 0) {
-    container.innerHTML = "<p>No streams available.</p>";
+    container.innerHTML = "<p>New events are being scheduled all the time. Check back regularly to see what we have scheduled.</p>";
     return;
   }
 
