@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>YouTube Livestreams</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 1rem;
+    background: #fff;
+  }
+
+  h2 {
+    margin-top: 2rem;
+    font-size: 1.25rem;
+  }
+
+  .stream-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+  }
+
+  .stream {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    overflow: hidden;
+    text-decoration: none;
+    color: #000;
+    background: #fafafa;
+  }
+
+  .stream img {
+    width: 100%;
+    display: block;
+  }
+
+  .stream-content {
+    padding: 0.75rem;
+  }
+
+  .title {
+    font-weight: bold;
+    margin-bottom: 0.25rem;
+  }
+
+  .date {
+    font-size: 0.85rem;
+    color: #555;
+  }
+</style>
+</head>
+
+<body>
+
+<h2>Upcoming livestreams</h2>
+<div id="upcoming" class="stream-list"></div>
+
+<h2>Past livestreams</h2>
+<div id="past" class="stream-list"></div>
+
+<script>
+const API_KEY = "AIzaSyDvflaf2WrXoTPnj1-cDHYWhCD_pMJnhoY";
+const CHANNEL_ID = "UC7Do00lxLh7l4WwXLl96P5A";
+const MAX_RESULTS = 10;
+
+function formatDate(isoDate) {
+  const d = new Date(isoDate);
+  return d.toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short"
+  });
+}
+
+function createCard(video) {
+  const videoId = video.id.videoId;
+  const snippet = video.snippet;
+
+  const link = document.createElement("a");
+  link.className = "stream";
+  link.href = `https://www.youtube.com/watch?v=${videoId}`;
+  link.target = "_blank";
+
+  link.innerHTML = `
+    <img src="${snippet.thumbnails.medium.url}" alt="">
+    <div class="stream-content">
+      <div class="title">${snippet.title}</div>
+      <div class="date">${formatDate(snippet.publishedAt)}</div>
+    </div>
+  `;
+  return link;
+}
+
+async function fetchStreams(eventType, containerId) {
+  const url =
+    "https://www.googleapis.com/youtube/v3/search" +
+    `?part=snippet` +
+    `&channelId=${CHANNEL_ID}` +
+    `&eventType=${eventType}` +
+    `&type=video` +
+    `&order=date` +
+    `&maxResults=${MAX_RESULTS}` +
+    `&key=${API_KEY}`;
+
+  const response = await fetch(url);
+  const data = await response.json();
+
+  const container = document.getElementById(containerId);
+  if (!data.items || data.items.length === 0) {
+    container.innerHTML = "<p>No streams available.</p>";
+    return;
+  }
+
+  data.items.forEach(video => {
+    container.appendChild(createCard(video));
+  });
+}
+
+// Upcoming first
+fetchStreams("upcoming", "upcoming");
+// Then past (completed livestreams)
+fetchStreams("completed", "past");
+</script>
+
+</body>
+</html>
