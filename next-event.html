@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Next Livestream</title>
+
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 1rem;
+    background: #fff;
+  }
+
+  .container {
+    max-width: 640px;
+    margin: 0 auto;
+  }
+
+  .stream {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    overflow: hidden;
+    background: #fafafa;
+  }
+
+  .stream img {
+    width: 100%;
+    display: block;
+  }
+
+  .content {
+    padding: 0.75rem;
+  }
+
+  .title {
+    font-weight: bold;
+    margin-bottom: 0.25rem;
+  }
+
+  .date,
+  .countdown {
+    font-size: 0.9rem;
+    color: #555;
+  }
+
+  .countdown {
+    margin-top: 0.25rem;
+    font-weight: bold;
+    color: #333;
+  }
+
+  .description {
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    color: #333;
+  }
+
+  .calendar {
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+  }
+
+  .calendar a {
+    margin-right: 0.75rem;
+    text-decoration: none;
+    color: #005398;
+  }
+
+  .calendar a:hover {
+    text-decoration: underline;
+  }
+
+  .watch-live {
+    margin-top: 0.75rem;
+  }
+
+  .watch-live a {
+    display: inline-block;
+    background: #cc0000;
+    color: #fff;
+    padding: 0.5rem 0.75rem;
+    text-decoration: none;
+    font-weight: bold;
+    border-radius: 3px;
+  }
+
+  .watch-live a:hover {
+    background: #a30000;
+  }
+
+  .none {
+    font-style: italic;
+    color: #666;
+  }
+</style>
+</head>
+
+<body>
+
+<div class="container" id="output">
+  Loading next livestream…
+</div>
+
+<script>
+const API_KEY = "AIzaSyDvflaf2WrXoTPnj1-cDHYWhCD_pMJnhoY";
+const CHANNEL_ID = "UC7Do00lxLh7l4WwXLl96P5A";
+const TIMEZONE = "Europe/London";
+const DESCRIPTION_LIMIT = 300;
+
+function formatUKDate(iso) {
+  return new Date(iso).toLocaleString("en-GB", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: TIMEZONE
+  });
+}
+
+function isLive(startISO) {
+  return new Date(startISO) <= new Date();
+}
+
+function timeUntil(startISO) {
+  const now = new Date();
+  const start = new Date(startISO);
+  const diff = start - now;
+
+  if (diff <= 0) return "Live now";
+
+  const mins = Math.floor(diff / 60000);
+  const hrs = Math.floor(mins / 60);
+  const days = Math.floor(hrs / 24);
+
+  if (days > 0) return `Starts in ${days} day${days !== 1 ? "s" : ""}`;
+  if (hrs > 0) return `Starts in ${hrs} hour${hrs !== 1 ? "s" : ""}`;
+  return `Starts in ${mins} minute${mins !== 1 ? "s" : ""}`;
+}
+
+function truncate(text, max) {
+  if (!text) return "";
+  return text.length > max ? text.substring(0, max) + "…" : text;
+}
+
+function calendarLinks(title, startISO, videoId) {
+  const start = new Date(startISO);
+  const end = new Date(start.getTime() + 60 * 60 * 1000);
+
+  const formatICS = d =>
+    d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+
+  const ics = `
+BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+DTSTART:${formatICS(start)}
+DTEND:${formatICS(end)}
+SUMMARY:${title}
+URL:https://www.youtube.com/watch?v=${videoId}
+END:VEVENT
+END:VCALENDAR
+`.trim();
+
+  const icsBlob = new Blob([ics], { type: "text/calendar" });
+  const icsUrl = URL.createObjectURL(icsBlob);
+
+  const google =
+    "https://www.google.com/calendar/render?action=TEMPLATE" +
+    `&text=${encodeURIComponent(title)}` +
+    `&dates=${formatICS(start)}/${formatICS(end)}` +
+    `&details=${encodeURIComponent("Watch on YouTube")}` +
+    `&location=${encodeURIComponent("YouTube")}`;
+
+  return `
+    <a href="${google}" target="_blank">Add to Google Calendar</a>
+    <a href="${icsUrl}" download="livestream.ics">Add to Outlook / Apple Calendar</a>
+  `;
+}
+
+function startCountdown(startISO, countdownEl, calendarEl, watchLiveEl) {
+  function update() {
+    const live = isLive(startISO);
+    countdownEl.textContent = timeUntil(startISO);
+
+    if (live) {
+      if (calendarEl) calendarEl.style.display = "none";
+      if (watchLiveEl) watchLiveEl.style.display = "block";
+    }
+  }
+
+  update();
+  setInterval(update, 60000);
+}
+
+async function loadNextLivestream() {
+  const searchUrl =
+    "https://www.googleapis.com/youtube/v3/search" +
+    `?part=snippet` +
+    `&channelId=${CHANNEL_ID}` +
+    `&eventType=upcoming` +
+    `&type=video` +
+    `&order=date` +
+    `&maxResults=1` +
+    `&key=${API_KEY}`;
+
+  const searchRes = await fetch(searchUrl);
+  const searchData = await searchRes.json();
+  const container = document.getElementById("output");
+
+  if (!searchData.items || searchData.items.length === 0) {
+    container.innerHTML =
+      `<p class="none">No upcoming livestreams are currently scheduled.</p>`;
+    return;
+  }
+
+  const videoId = searchData.items[0].id.videoId;
+
+  const videoUrl =
+    "https://www.googleapis.com/youtube/v3/videos" +
+    `?part=snippet` +
+    `&id=${videoId}` +
+    `&key=${API_KEY}`;
+
+  const videoRes = await fetch(videoUrl);
+  const videoData = await videoRes.json();
+  const video = videoData.items[0];
+
+  const { title, description, publishedAt, thumbnails } = video.snippet;
+
+  container.innerHTML = `
+    <div class="stream">
+      <a href="https://www.youtube.com/watch?v=${videoId}" target="_blank">
+        <img src="${thumbnails.medium.url}" alt="">
+      </a>
+      <div class="content">
+        <div class="title">${title}</div>
+        <div class="date">${formatUKDate(publishedAt)} (UK time)</div>
+        <div class="countdown" id="countdown"></div>
+        <div class="description">${truncate(description, DESCRIPTION_LIMIT)}</div>
+        <div class="calendar" id="calendar">
+          ${calendarLinks(title, publishedAt, videoId)}
+        </div>
+        <div class="watch-live" id="watchLive" style="display:none">
+          <a href="https://www.youtube.com/watch?v=${videoId}&live_chat=1" target="_blank">
+            ▶ Watch live on YouTube (with chat)
+          </a>
+        </div>
+      </div>
+    </div>
+  `;
+
+  startCountdown(
+    publishedAt,
+    document.getElementById("countdown"),
+    document.getElementById("calendar"),
+    document.getElementById("watchLive")
+  );
+}
+
+loadNextLivestream();
+</script>
+
+</body>
+</html>
