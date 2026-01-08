@@ -1,131 +1,232 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>YouTube Livestreams</title>
-<!-- PT Sans -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&display=swap" rel="stylesheet">
-<style>
-  body {
-    font-family: 'PT Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-    margin: 0;
-    padding: 1rem;
-    background: #fff;
-  }
+  <meta charset="UTF-8" />
+  <title>YouTube Livestreams</title>
 
-  h2 {
-    margin-top: 2rem;
-    font-size: 1.25rem;
-  }
+  <!-- PT Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&display=swap"
+    rel="stylesheet"
+  />
 
-  .stream-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 1rem;
-  }
+  <style>
+    body {
+      font-family: 'PT Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      margin: 0;
+      padding: 1rem;
+      background: #fff;
+    }
 
-  .stream {
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    overflow: hidden;
-    text-decoration: none;
-    color: #000;
-    background: #fafafa;
-  }
+    h2, h3 {
+      margin-top: 2rem;
+      font-size: 1.25rem;
+    }
 
-  .stream img {
-    width: 100%;
-    display: block;
-  }
+    .stream-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1rem;
+    }
 
-  .stream-content {
-    padding: 0.75rem;
-  }
+    .stream {
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      overflow: hidden;
+      text-decoration: none;
+      color: #000;
+      background: #fafafa;
+    }
 
-  .title {
-    font-weight: bold;
-    margin-bottom: 0.25rem;
-  }
+    .stream img {
+      width: 100%;
+      display: block;
+    }
 
-  .date {
-    font-size: 0.85rem;
-    color: #555;
-  }
-</style>
+    .stream-content {
+      padding: 0.75rem;
+    }
+
+    .title {
+      font-weight: bold;
+      margin-bottom: 0.25rem;
+    }
+
+    .date {
+      font-size: 0.85rem;
+      color: #555;
+    }
+  </style>
 </head>
 
 <body>
+  <h3>More Upcoming Events</h3>
+  <div id="upcoming" class="stream-list"></div>
 
-<h3>More Upcoming Events</h3>
-<div id="upcoming" class="stream-list"></div>
+  <h3>Recordings of Previous Events</h3>
+  <div id="past" class="stream-list"></div>
 
-<h3>Recordings of Previous Events</h3>
-<div id="past" class="stream-list"></div>
+  <script>
+    const API_KEY = "AIzaSyDvflaf2WrXoTPnj1-cDHYWhCD_pMJnhoY";
+    const CHANNEL_ID = "UC7Do00lxLh7l4WwXLl96P5A";
 
-<script>
-const API_KEY = "AIzaSyDvflaf2WrXoTPnj1-cDHYWhCD_pMJnhoY";
-const CHANNEL_ID = "UC7Do00lxLh7l4WwXLl96P5A";
-const MAX_RESULTS = 10;
+    // Requirements:
+    // - Upcoming: unlimited (fetch all pages)
+    // - Past: restrict to 24
+    const PAST_LIMIT = 24;
 
-function formatDate(isoDate) {
-  const d = new Date(isoDate);
-  return d.toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short"
-  });
-}
+    // Search API allows up to 50 per page
+    const PAGE_SIZE = 50;
 
-function createCard(video) {
-  const videoId = video.id.videoId;
-  const snippet = video.snippet;
+    function formatDate(isoDate) {
+      if (!isoDate) return "Date unavailable";
+      const d = new Date(isoDate);
+      return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+    }
 
-  const link = document.createElement("a");
-  link.className = "stream";
-  link.href = `https://www.youtube.com/watch?v=${videoId}`;
-  link.target = "_blank";
+    function createCard(video, streamIsoDate) {
+      const videoId = video.id; // from videos.list, id is a string
+      const snippet = video.snippet;
 
-  link.innerHTML = `
-    <img src="${snippet.thumbnails.medium.url}" alt="">
-    <div class="stream-content">
-      <div class="title">${snippet.title}</div>
-      <div class="date">${formatDate(snippet.publishedAt)}</div>
-    </div>
-  `;
-  return link;
-}
+      const link = document.createElement("a");
+      link.className = "stream";
+      link.href = `https://www.youtube.com/watch?v=${videoId}`;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
 
-async function fetchStreams(eventType, containerId) {
-  const url =
-    "https://www.googleapis.com/youtube/v3/search" +
-    `?part=snippet` +
-    `&channelId=${CHANNEL_ID}` +
-    `&eventType=${eventType}` +
-    `&type=video` +
-    `&order=date` +
-    `&maxResults=${MAX_RESULTS}` +
-    `&key=${API_KEY}`;
+      link.innerHTML = `
+        <img src="${snippet.thumbnails?.medium?.url || snippet.thumbnails?.default?.url || ""}" alt="">
+        <div class="stream-content">
+          <div class="title">${snippet.title}</div>
+          <div class="date">${formatDate(streamIsoDate)}</div>
+        </div>
+      `;
+      return link;
+    }
 
-  const response = await fetch(url);
-  const data = await response.json();
+    /**
+     * Step 1: Get all livestream video IDs for an eventType from search.list.
+     * - eventType: "upcoming" | "completed"
+     * - limit: number of IDs to collect (null/Infinity for unlimited)
+     */
+    async function fetchLivestreamIds(eventType, limit = Infinity) {
+      let ids = [];
+      let pageToken = "";
 
-  const container = document.getElementById(containerId);
-  if (!data.items || data.items.length === 0) {
-    container.innerHTML = "<p>We regulary add new events. Please check back to see what we have scheduled.</p>";
-    return;
-  }
+      while (ids.length < limit) {
+        const url =
+          "https://www.googleapis.com/youtube/v3/search" +
+          `?part=snippet` +
+          `&channelId=${encodeURIComponent(CHANNEL_ID)}` +
+          `&eventType=${encodeURIComponent(eventType)}` +
+          `&type=video` +
+          `&maxResults=${PAGE_SIZE}` +
+          (pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : "") +
+          `&key=${encodeURIComponent(API_KEY)}`;
 
-  data.items.forEach(video => {
-    container.appendChild(createCard(video));
-  });
-}
+        const response = await fetch(url);
+        const data = await response.json();
 
-// Upcoming first
-fetchStreams("upcoming", "upcoming");
-// Then past (completed livestreams)
-fetchStreams("completed", "past");
-</script>
+        if (!data.items || data.items.length === 0) break;
 
+        for (const item of data.items) {
+          const vid = item?.id?.videoId;
+          if (vid) ids.push(vid);
+          if (ids.length >= limit) break;
+        }
+
+        pageToken = data.nextPageToken;
+        if (!pageToken) break;
+      }
+
+      return ids;
+    }
+
+    /**
+     * Step 2: Fetch full video details (including liveStreamingDetails) via videos.list.
+     * Accepts an array of IDs and returns a flat array of video objects.
+     */
+    async function fetchVideoDetails(videoIds) {
+      const results = [];
+      const chunkSize = 50; // max ids per videos.list call
+
+      for (let i = 0; i < videoIds.length; i += chunkSize) {
+        const chunk = videoIds.slice(i, i + chunkSize);
+
+        const url =
+          "https://www.googleapis.com/youtube/v3/videos" +
+          `?part=snippet,liveStreamingDetails` +
+          `&id=${encodeURIComponent(chunk.join(","))}` +
+          `&key=${encodeURIComponent(API_KEY)}`;
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.items && data.items.length) {
+          results.push(...data.items);
+        }
+      }
+
+      return results;
+    }
+
+    /**
+     * Step 3: Build stream objects with the *streaming* datetime,
+     * then sort/render.
+     */
+    async function renderStreams(eventType, containerId, limit = Infinity) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = "";
+
+      // 1) IDs from search.list
+      const ids = await fetchLivestreamIds(eventType, limit);
+
+      if (!ids.length) {
+        container.innerHTML = "<p>We regularly add new events. Please check back to see what we have scheduled.</p>";
+        return;
+      }
+
+      // 2) Details from videos.list
+      const videos = await fetchVideoDetails(ids);
+
+      // 3) Extract the correct streaming date
+      // upcoming -> scheduledStartTime
+      // completed -> actualStartTime (fallback to scheduledStartTime)
+      const mapped = videos.map(v => {
+        const live = v.liveStreamingDetails || {};
+        const streamDate =
+          (eventType === "upcoming")
+            ? live.scheduledStartTime
+            : (live.actualStartTime || live.scheduledStartTime);
+
+        return { video: v, streamDate };
+      }).filter(x => x.streamDate); // keep only those with a stream date
+
+      // 4) Sort by streaming date (not published)
+      mapped.sort((a, b) => {
+        const tA = new Date(a.streamDate).getTime();
+        const tB = new Date(b.streamDate).getTime();
+        // upcoming: soonest first, past: newest first
+        return eventType === "upcoming" ? (tA - tB) : (tB - tA);
+      });
+
+      // 5) Apply limit for past streams (24), unlimited for upcoming
+      const finalList = mapped.slice(0, limit);
+
+      // 6) Render
+      for (const item of finalList) {
+        container.appendChild(createCard(item.video, item.streamDate));
+      }
+    }
+
+    // Upcoming: unlimited
+    renderStreams("upcoming", "upcoming", Infinity);
+
+    // Past: max 24
+    renderStreams("completed", "past", PAST_LIMIT);
+  </script>
 </body>
 </html>
