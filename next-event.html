@@ -170,6 +170,7 @@ END:VCALENDAR
   return `
     <a href="${google}" target="_blank">Add to Google Calendar</a>
     <a href="${icsUrl}" download="livestream.ics">Add to Outlook / Apple Calendar</a>
+    <a href="https://www.youtube.com/channel/UC7Do00lxLh7l4WwXLl96P5A?sub_confirmation=1">Subscribe to YouTube Channel</a>
   `;
 }
 
@@ -275,7 +276,7 @@ async function loadNextLivestream() {
 
   if (!searchData.items || searchData.items.length === 0) {
     document.getElementById("output").innerHTML =
-      `<p class="none">No upcoming livestreams are currently scheduled.</p>`;
+      `<p class="none">No upcoming events are currently scheduled. Check back soon - new events are added all the time.</p>`;
     return;
   }
 
@@ -293,7 +294,7 @@ async function loadNextLivestream() {
 
   if (!video || video.status.privacyStatus !== "public") {
     document.getElementById("output").innerHTML =
-      `<p class="none">No upcoming public livestreams are currently scheduled.</p>`;
+      `<p class="none">No upcoming events are currently scheduled. Check back soon - new events are added all the time.</p>`;
     return;
   }
 
