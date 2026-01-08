@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,9 +5,9 @@
   <title>YouTube Livestreams</title>
 
   <!-- PT Sans -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&display=swap" rel="stylesheet">
 
   <style>
     body {
@@ -18,7 +17,7 @@
       background: #fff;
     }
 
-    h2, h3 {
+    h3 {
       margin-top: 2rem;
       font-size: 1.25rem;
     }
@@ -36,6 +35,7 @@
       text-decoration: none;
       color: #000;
       background: #fafafa;
+      display: block;
     }
 
     .stream img {
@@ -56,10 +56,17 @@
       font-size: 0.85rem;
       color: #555;
     }
+
+    .message {
+      grid-column: 1 / -1;
+      color: #555;
+      padding: 0.5rem 0;
+    }
   </style>
 </head>
 
 <body>
+
   <h3>More Upcoming Events</h3>
   <div id="upcoming" class="stream-list"></div>
 
@@ -70,13 +77,10 @@
     const API_KEY = "AIzaSyDvflaf2WrXoTPnj1-cDHYWhCD_pMJnhoY";
     const CHANNEL_ID = "UC7Do00lxLh7l4WwXLl96P5A";
 
-    // Requirements:
-    // - Upcoming: unlimited (fetch all pages)
-    // - Past: restrict to 24
-    const PAST_LIMIT = 24;
-
-    // Search API allows up to 50 per page
-    const PAGE_SIZE = 50;
+    // Requirements
+    const PAST_DISPLAY_LIMIT = 24;     // show only 24 past events
+    const PAST_FETCH_LIMIT = 50;       // only fetch most recent 50 by published date (your preference)
+    const PAGE_SIZE = 50;              // max allowed for search.list/videos.list
 
     function formatDate(isoDate) {
       if (!isoDate) return "Date unavailable";
@@ -84,9 +88,19 @@
       return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
     }
 
+    function showMessage(container, text) {
+      container.innerHTML = `<div class="message">${text}</div>`;
+    }
+
     function createCard(video, streamIsoDate) {
-      const videoId = video.id; // from videos.list, id is a string
-      const snippet = video.snippet;
+      const videoId = video.id; // videos.list returns string ID
+      const snippet = video.snippet || {};
+      const thumbs = snippet.thumbnails || {};
+      const thumbUrl =
+        (thumbs.medium && thumbs.medium.url) ||
+        (thumbs.high && thumbs.high.url) ||
+        (thumbs.default && thumbs.default.url) ||
+        "";
 
       const link = document.createElement("a");
       link.className = "stream";
@@ -95,37 +109,43 @@
       link.rel = "noopener noreferrer";
 
       link.innerHTML = `
-        <img src="${snippet.thumbnails?.medium?.url || snippet.thumbnails?.default?.url || ""}" alt="">
+        ${thumbUrl ? `<img src="${thumbUrl}" alt="">` : ""}
         <div class="stream-content">
-          <div class="title">${snippet.title}</div>
+          <div class="title">${snippet.title || "Untitled stream"}</div>
           <div class="date">${formatDate(streamIsoDate)}</div>
         </div>
       `;
+
       return link;
     }
 
     /**
-     * Step 1: Get all livestream video IDs for an eventType from search.list.
+     * Fetch livestream video IDs from search.list.
      * - eventType: "upcoming" | "completed"
-     * - limit: number of IDs to collect (null/Infinity for unlimited)
+     * - limit: number of IDs to collect (Infinity for unlimited)
+     *
+     * NOTE: order=date sorts by published date (closest proxy), which you requested.
      */
     async function fetchLivestreamIds(eventType, limit = Infinity) {
-      let ids = [];
+      const ids = [];
       let pageToken = "";
 
       while (ids.length < limit) {
+        const maxResults = Math.min(PAGE_SIZE, limit === Infinity ? PAGE_SIZE : (limit - ids.length));
+
         const url =
           "https://www.googleapis.com/youtube/v3/search" +
           `?part=snippet` +
           `&channelId=${encodeURIComponent(CHANNEL_ID)}` +
           `&eventType=${encodeURIComponent(eventType)}` +
           `&type=video` +
-          `&maxResults=${PAGE_SIZE}` +
+          `&order=date` +
+          `&maxResults=${maxResults}` +
           (pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : "") +
           `&key=${encodeURIComponent(API_KEY)}`;
 
-        const response = await fetch(url);
-        const data = await response.json();
+        const res = await fetch(url);
+        const data = await res.json();
 
         if (!data.items || data.items.length === 0) break;
 
@@ -143,87 +163,96 @@
     }
 
     /**
-     * Step 2: Fetch full video details (including liveStreamingDetails) via videos.list.
-     * Accepts an array of IDs and returns a flat array of video objects.
+     * Fetch full details for a list of video IDs (snippet + liveStreamingDetails).
      */
     async function fetchVideoDetails(videoIds) {
       const results = [];
-      const chunkSize = 50; // max ids per videos.list call
+      const chunkSize = 50;
 
       for (let i = 0; i < videoIds.length; i += chunkSize) {
         const chunk = videoIds.slice(i, i + chunkSize);
-
         const url =
           "https://www.googleapis.com/youtube/v3/videos" +
           `?part=snippet,liveStreamingDetails` +
           `&id=${encodeURIComponent(chunk.join(","))}` +
           `&key=${encodeURIComponent(API_KEY)}`;
 
-        const response = await fetch(url);
-        const data = await response.json();
+        const res = await fetch(url);
+        const data = await res.json();
 
-        if (data.items && data.items.length) {
-          results.push(...data.items);
-        }
+        if (data.items && data.items.length) results.push(...data.items);
       }
 
       return results;
     }
 
     /**
-     * Step 3: Build stream objects with the *streaming* datetime,
-     * then sort/render.
+     * Render streams ordered by STREAM date:
+     * - Upcoming: scheduledStartTime (ascending)
+     * - Completed: actualStartTime (descending), fallback to scheduledStartTime
      */
-    async function renderStreams(eventType, containerId, limit = Infinity) {
+    async function renderStreams(eventType, containerId, displayLimit = Infinity, fetchLimit = Infinity) {
       const container = document.getElementById(containerId);
       container.innerHTML = "";
 
-      // 1) IDs from search.list
-      const ids = await fetchLivestreamIds(eventType, limit);
+      try {
+        // 1) IDs from search.list
+        const ids = await fetchLivestreamIds(eventType, fetchLimit);
 
-      if (!ids.length) {
-        container.innerHTML = "<p>We regularly add new events. Please check back to see what we have scheduled.</p>";
-        return;
-      }
+        if (!ids.length) {
+          showMessage(container, "We regularly add new events. Please check back to see what we have scheduled.");
+          return;
+        }
 
-      // 2) Details from videos.list
-      const videos = await fetchVideoDetails(ids);
+        // 2) Details from videos.list
+        const videos = await fetchVideoDetails(ids);
 
-      // 3) Extract the correct streaming date
-      // upcoming -> scheduledStartTime
-      // completed -> actualStartTime (fallback to scheduledStartTime)
-      const mapped = videos.map(v => {
-        const live = v.liveStreamingDetails || {};
-        const streamDate =
-          (eventType === "upcoming")
-            ? live.scheduledStartTime
-            : (live.actualStartTime || live.scheduledStartTime);
+        // 3) Build array with stream date
+        const mapped = videos.map(v => {
+          const live = v.liveStreamingDetails || {};
+          let streamDate;
 
-        return { video: v, streamDate };
-      }).filter(x => x.streamDate); // keep only those with a stream date
+          if (eventType === "upcoming") {
+            streamDate = live.scheduledStartTime;
+          } else {
+            // completed: use actualStartTime where possible
+            streamDate = live.actualStartTime || live.scheduledStartTime;
+          }
 
-      // 4) Sort by streaming date (not published)
-      mapped.sort((a, b) => {
-        const tA = new Date(a.streamDate).getTime();
-        const tB = new Date(b.streamDate).getTime();
-        // upcoming: soonest first, past: newest first
-        return eventType === "upcoming" ? (tA - tB) : (tB - tA);
-      });
+          return { video: v, streamDate };
+        }).filter(x => x.streamDate); // keep only items with a meaningful stream date
 
-      // 5) Apply limit for past streams (24), unlimited for upcoming
-      const finalList = mapped.slice(0, limit);
+        if (!mapped.length) {
+          showMessage(container, "No livestream dates were found for these videos.");
+          return;
+        }
 
-      // 6) Render
-      for (const item of finalList) {
-        container.appendChild(createCard(item.video, item.streamDate));
+        // 4) Sort by stream date
+        mapped.sort((a, b) => {
+          const tA = new Date(a.streamDate).getTime();
+          const tB = new Date(b.streamDate).getTime();
+          // Upcoming: soonest first; Completed: most recent first
+          return eventType === "upcoming" ? (tA - tB) : (tB - tA);
+        });
+
+        // 5) Apply display limit
+        const finalList = mapped.slice(0, displayLimit);
+
+        // 6) Render cards
+        finalList.forEach(item => container.appendChild(createCard(item.video, item.streamDate)));
+
+      } catch (err) {
+        console.error(err);
+        showMessage(container, "Sorry — there was a problem loading livestreams right now.");
       }
     }
 
     // Upcoming: unlimited
-    renderStreams("upcoming", "upcoming", Infinity);
+    renderStreams("upcoming", "upcoming", Infinity, Infinity);
 
-    // Past: max 24
-    renderStreams("completed", "past", PAST_LIMIT);
+    // Past: fetch 50 most recently published (proxy), then sort by actual stream time and show 24
+    renderStreams("completed", "past", PAST_DISPLAY_LIMIT, PAST_FETCH_LIMIT);
   </script>
+
 </body>
 </html>
