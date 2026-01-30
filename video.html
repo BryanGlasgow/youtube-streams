@@ -23,7 +23,7 @@
   }
 
   .stream {
-    /* Removed grey border and rounded corners (Option B) */
+    /* Removed border + rounded corners (Option B) */
     border: none;
     border-radius: 0;
     overflow: hidden;
@@ -67,7 +67,6 @@
   .watch-yt {
     margin-top: 0.75rem;
   }
-
   .watch-yt .yt-button {
     display: inline-block;
     background: #cc0000;
@@ -78,7 +77,6 @@
     border-radius: 4px;
     font-size: 1rem;
   }
-
   .watch-yt .yt-button:hover {
     background: #a30000;
   }
@@ -89,13 +87,11 @@
     color: #000000;
     white-space: pre-wrap;  /* preserve line breaks like YouTube */
   }
-
   .description a {
     color: #005398;
     text-decoration: none;
     word-break: break-word;
   }
-
   .description a:hover {
     text-decoration: underline;
   }
@@ -104,19 +100,16 @@
     margin-top: 0.5rem;
     font-size: 0.85rem;
   }
-
   .calendar a {
     margin-right: 0.75rem;
     text-decoration: none;
     color: #005398;
   }
-
   .calendar a:hover { text-decoration: underline; }
 
   .watch-live {
     margin-top: 0.75rem;
   }
-
   .watch-live a {
     display: inline-block;
     background: #cc0000;
@@ -126,7 +119,6 @@
     font-weight: bold;
     border-radius: 3px;
   }
-
   .watch-live a:hover { background: #a30000; }
 
   .none {
@@ -171,7 +163,7 @@ function getVideoIdFromQuery() {
       }
       const idParam = url.searchParams.get("v");
       if (idParam) return idParam.trim();
-      // Handle /live/<id> or other paths
+      // Handle other paths: /live/<id>, etc.
       const parts = url.pathname.split("/").filter(Boolean);
       if (parts.length) return parts[parts.length - 1];
     } catch {}
@@ -216,28 +208,27 @@ END:VCALENDAR`.trim();
 
   const google =
     "https://www.google.com/calendar/render?action=TEMPLATE" +
-    \`&text=\${encodeURIComponent(title)}\` +
-    \`&dates=\${formatICS(start)}/\${formatICS(end)}\` +
-    \`&details=\${encodeURIComponent("Watch on YouTube")}\` +
-    \`&location=\${encodeURIComponent("YouTube")}\`;
+    `&text=${encodeURIComponent(title)}` +
+    `&dates=${formatICS(start)}/${formatICS(end)}` +
+    `&details=${encodeURIComponent("Watch on YouTube")}` +
+    `&location=${encodeURIComponent("YouTube")}`;
 
-  return \`
-    <a href="\${google}" target="_blank" rel="noopener noreferrer">Add to Google Calendar</a>
-    <a href="\${icsUrl}" download="livestream.ics">Add to Outlook / Apple Calendar</a>
+  return `
+    <a href="${google}" target="_blank" rel="noopener noreferrer">Add to Google Calendar</a>
+    <a href="${icsUrl}" download="livestream.ics">Add to Outlook / Apple Calendar</a>
     <a href="https://www.youtube.com/channel/UC7Do00lxLh7l4WwXLl96P5A?sub_confirmation=1" target="_blank" rel="noopener noreferrer">Subscribe</a>
-  \`;
+  `;
 }
 
 /* =======================
    LINKIFY (URLs, timestamps, hashtags, @mentions)
-   - Safe: starts from plain text (escaped), then only inserts <a> elements
+   Safe: start from plain text (escaped), then only insert <a> elements.
 ======================= */
 function linkifyDescription(rawText, videoId) {
-  // Build a safe container from plain text (escapes HTML)
   const container = document.createElement('div');
   container.textContent = rawText || "";
 
-  // Applies a regex replacement to all TEXT nodes (not inside <a>)
+  // Replace in TEXT nodes only
   function replaceInTextNodes(root, regex, builder) {
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
     const nodes = [];
@@ -252,24 +243,17 @@ function linkifyDescription(rawText, videoId) {
 
       regex.lastIndex = 0;
       while ((m = regex.exec(text)) !== null) {
-        // Append text before match
         frag.appendChild(document.createTextNode(text.slice(lastIndex, m.index)));
         builder(frag, m);
         lastIndex = regex.lastIndex;
-
-        // Guard against zero-width matches
-        if (m.index === regex.lastIndex) regex.lastIndex++;
+        if (m.index === regex.lastIndex) regex.lastIndex++; // guard
       }
-
-      // Remainder
       frag.appendChild(document.createTextNode(text.slice(lastIndex)));
-
-      // Replace node
       node.parentNode.replaceChild(frag, node);
     });
   }
 
-  // 1) URLs: http(s)://... or www....
+  // 1) URLs (http/https/www.)
   const urlRegex = /((https?:\/\/)[^\s<]+)|(www\.[^\s<]+)/gi;
   replaceInTextNodes(container, urlRegex, (frag, m) => {
     const url = m[1] || m[3];
@@ -282,60 +266,55 @@ function linkifyDescription(rawText, videoId) {
     frag.appendChild(a);
   });
 
-  // 2) Timestamps: mm:ss or hh:mm:ss  (boundary via prefix capture)
+  // 2) Timestamps mm:ss or hh:mm:ss
   const tsRegex = /(^|[\s(])(\d{1,2}):([0-5]\d)(?::([0-5]\d))?\b/g;
   replaceInTextNodes(container, tsRegex, (frag, m) => {
     const prefix = m[1] || '';
-    const a = document.createElement('a');
+    if (prefix) frag.appendChild(document.createTextNode(prefix));
 
-    // Compute seconds
     let seconds = 0;
     if (m[4] !== undefined) {
-      // hh:mm:ss
       const h = parseInt(m[2], 10);
       const mm = parseInt(m[3], 10);
       const ss = parseInt(m[4], 10);
       seconds = h * 3600 + mm * 60 + ss;
     } else {
-      // mm:ss
       const mm = parseInt(m[2], 10);
       const ss = parseInt(m[3], 10);
       seconds = mm * 60 + ss;
     }
 
-    // Append prefix text (e.g., space or '(' ) before the link
-    if (prefix) frag.appendChild(document.createTextNode(prefix));
-
+    const a = document.createElement('a');
     const label = m[0].slice(prefix.length);
-    a.href = \`https://www.youtube.com/watch?v=\${videoId}&t=\${seconds}s\`;
+    a.href = `https://www.youtube.com/watch?v=${videoId}&t=${seconds}s`;
     a.target = '_blank';
     a.rel = 'noopener noreferrer';
     a.textContent = label;
     frag.appendChild(a);
   });
 
-  // 3) Hashtags: #Topic
+  // 3) Hashtags #Topic
   const hashRegex = /(^|[\s(])#([A-Za-z0-9_]+)\b/g;
   replaceInTextNodes(container, hashRegex, (frag, m) => {
     const prefix = m[1] || '';
     if (prefix) frag.appendChild(document.createTextNode(prefix));
     const tag = m[2];
     const a = document.createElement('a');
-    a.href = \`https://www.youtube.com/hashtag/\${tag.toLowerCase()}\`;
+    a.href = `https://www.youtube.com/hashtag/${tag.toLowerCase()}`;
     a.target = '_blank';
     a.rel = 'noopener noreferrer';
     a.textContent = '#' + tag;
     frag.appendChild(a);
   });
 
-  // 4) Mentions: @handle
+  // 4) Mentions @handle
   const atRegex = /(^|[\s(])@([A-Za-z0-9._-]{3,})\b/g;
   replaceInTextNodes(container, atRegex, (frag, m) => {
     const prefix = m[1] || '';
     if (prefix) frag.appendChild(document.createTextNode(prefix));
     const handle = m[2];
     const a = document.createElement('a');
-    a.href = \`https://www.youtube.com/@\${handle}\`;
+    a.href = `https://www.youtube.com/@${handle}`;
     a.target = '_blank';
     a.rel = 'noopener noreferrer';
     a.textContent = '@' + handle;
@@ -420,6 +399,7 @@ function startLiveMonitor(videoId, stateRef, countdownEl, calendarEl, watchLiveE
         `&key=${API_KEY}`;
 
       const res = await fetch(url);
+      if (!res.ok) return;
       const data = await res.json();
       const lsd = data.items?.[0]?.liveStreamingDetails || {};
 
@@ -439,6 +419,22 @@ function startLiveMonitor(videoId, stateRef, countdownEl, calendarEl, watchLiveE
 }
 
 /* =======================
+   IMAGE FALLBACK (maxres -> hq720 -> apiThumb)
+======================= */
+function imgFallback(img) {
+  // If maxres fails, try hq720, then apiThumb.
+  if (!img.dataset.fallbackTried1) {
+    img.dataset.fallbackTried1 = "1";
+    img.src = img.dataset.fallback1; // hq720
+  } else if (!img.dataset.fallbackTried2) {
+    img.dataset.fallbackTried2 = "1";
+    img.src = img.dataset.fallback2; // apiThumb
+  } else {
+    // Give up silently; at least apiThumb was attempted
+  }
+}
+
+/* =======================
    RENDER VIDEO
 ======================= */
 function renderVideo(v) {
@@ -453,15 +449,15 @@ function renderVideo(v) {
     actualStartTime,
     actualEndTime,
     isLiveInitial,
-    apiThumb /* guaranteed fallback thumbnail from API */
+    apiThumb /* always present from API selection */
   } = v;
 
   const hasLiveData = !!scheduledStartTime || !!actualStartTime || !!actualEndTime;
 
-  // Build the linked (safe) description HTML
+  // Linkified description
   const linkedDescription = linkifyDescription(description, videoId);
 
-  // Thumbnail with robust fallbacks: maxres -> hq720 -> API-provided
+  // Thumbnail sources
   const maxres = `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`;
   const hq720  = `https://i.ytimg.com/vi/${videoId}/hq720.jpg`;
 
@@ -470,9 +466,11 @@ function renderVideo(v) {
       <a href="https://www.youtube.com/watch?v=${videoId}" target="_blank" rel="noopener noreferrer">
         <img
           src="${maxres}"
-          alt="${title ? title.replace(/"/g, '&quot;') : 'YouTube thumbnail'}"
-          onerror="this.onerror=null; this.src='${hq720}'; this.onerror=function(){ this.onerror=null; this.src='${apiThumb}'; };"
-        />
+          data-fallback1="${hq720}"
+          data-fallback2="${apiThumb}"
+          onerror="imgFallback(this)"
+          alt=""
+        >
       </a>
 
       <div class="content">
@@ -488,9 +486,11 @@ function renderVideo(v) {
 
         <div class="countdown" id="countdown"></div>
 
-        <!-- Prominent Watch on YouTube button (Option A, at bottom above description) -->
+        <!-- Prominent Watch on YouTube button (Option A, bottom above description) -->
         <div class="watch-yt">
-          <a class="yt-button" href="https://www.youtube.com/watch?v=${videoId}" target="_blank" rel="noopener noreferrer">▶ Watch on YouTube</a>
+          <a class="yt-button" href="https://www.youtube.com/watch?v=${videoId}" target="_blank" rel="noopener noreferrer">
+            ▶ Watch on YouTube
+          </a>
         </div>
 
         <!-- Full description (no truncation) with linkifying -->
@@ -503,23 +503,7 @@ function renderVideo(v) {
         </div>
 
         <div class="watch-live" id="watchLive" style="display:none">
-          <a href="https://www.youtube.com/watch?v=${videoId}&live_chat=1" target="_blank" rel="noopener noreferrer">
-            ▶ Watch live on YouTube
-          </a>
-        </div>
-      </div>
-    </div>
-  `;
-
-  const countdownEl = document.getElementById("countdown");
-  const calendarEl = document.getElementById("calendar");
-  const watchLiveEl = document.getElementById("watchLive");
-
-  const stateRef = { isLive: isLiveInitial, hasEnded: !!actualEndTime };
-
-  if (hasLiveData) {
-    startCountdown(scheduledStartTime, countdownEl, calendarEl, watchLiveEl, stateRef);
-    startLiveMonitor(videoId, stateRef, countdownEl, calendarEl, watchLiveEl, scheduledStartTime);
+          <a href="httpseRef, countdownEl, calendarEl, watchLiveEl, scheduledStartTime);
   }
 }
 
