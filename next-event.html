@@ -1,13 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
+<meta charset="UTF-8" />
 <title>Next Livestream</title>
 
 <!-- PT Sans -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&display=swap" rel="stylesheet" />
 
 <style>
   body {
@@ -16,19 +16,78 @@
     padding: 1rem;
     background: #ffffff;
   }
-  .container { max-width: 640px; margin: 0 auto; }
-  .stream { border: 1px solid #ddd; border-radius: 4px; overflow: hidden; background: #fff; }
-  .stream img { width: 100%; display: block; }
-  .content { padding: 0.75rem; }
-  .title { font-weight: bold; margin-bottom: 0.25rem; }
-  .date { font-size: 0.9rem; color: #555; }
-  .countdown { margin-top: 0.25rem; font-size: 0.95rem; font-weight: bold; color: #333; }
-  .live { color: #cc0000; }
-  .description { margin-top: 0.5rem; font-size: 0.9rem; color: #000; }
-  .calendar { margin-top: 0.5rem; font-size: 0.85rem; }
-  .calendar a { margin-right: 0.75rem; text-decoration: none; color: #005398; }
-  .calendar a:hover { text-decoration: underline; }
-  .watch-live { margin-top: 0.75rem; }
+
+  .container {
+    max-width: 640px; /* keep your current layout width */
+    margin: 0 auto;
+  }
+
+  .stream {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    overflow: hidden;
+    background: #ffffff;
+  }
+
+  .stream img {
+    width: 100%;
+    display: block;
+    /* keep a clean 16:9 frame and avoid letterboxing */
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    object-position: center;
+  }
+
+  .content {
+    padding: 0.75rem;
+  }
+
+  .title {
+    font-weight: bold;
+    margin-bottom: 0.25rem;
+  }
+
+  .date {
+    font-size: 0.9rem;
+    color: #555;
+  }
+
+  .countdown {
+    margin-top: 0.25rem;
+    font-size: 0.95rem;
+    font-weight: bold;
+    color: #333;
+  }
+
+  .live {
+    color: #cc0000;
+  }
+
+  .description {
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    color: #000000;
+  }
+
+  .calendar {
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+  }
+
+  .calendar a {
+    margin-right: 0.75rem;
+    text-decoration: none;
+    color: #005398;
+  }
+
+  .calendar a:hover {
+    text-decoration: underline;
+  }
+
+  .watch-live {
+    margin-top: 0.75rem;
+  }
+
   .watch-live a {
     display: inline-block;
     background: #cc0000;
@@ -38,8 +97,15 @@
     font-weight: bold;
     border-radius: 3px;
   }
-  .watch-live a:hover { background: #a30000; }
-  .none { font-style: italic; color: #666; }
+
+  .watch-live a:hover {
+    background: #a30000;
+  }
+
+  .none {
+    font-style: italic;
+    color: #666;
+  }
 </style>
 </head>
 
@@ -58,7 +124,7 @@ const CHANNEL_ID = "UC7Do00lxLh7l4WwXLl96P5A";
 const TIMEZONE = "Europe/London";
 const DESCRIPTION_LIMIT = 200;
 
-/* DEV MODE */
+/* DEV MODE (as requested) */
 const TEST_MODE = false;
 
 /* =======================
@@ -77,14 +143,11 @@ function truncate(text, max) {
   return text.length > max ? text.substring(0, max) + "…" : text;
 }
 
-/* Calendar links unchanged… */
-
 function calendarLinks(title, startISO, videoId) {
   const start = new Date(startISO);
   const end = new Date(start.getTime() + 60 * 60 * 1000);
 
-  const formatICS = d =>
-    d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+  const formatICS = d => d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
 
   const ics = `
 BEGIN:VCALENDAR
@@ -95,7 +158,8 @@ DTEND:${formatICS(end)}
 SUMMARY:${title}
 URL:https://www.youtube.com/watch?v=${videoId}
 END:VEVENT
-END:VCALENDAR`.trim();
+END:VCALENDAR
+  `.trim();
 
   const icsBlob = new Blob([ics], { type: "text/calendar" });
   const icsUrl = URL.createObjectURL(icsBlob);
@@ -108,18 +172,23 @@ END:VCALENDAR`.trim();
     `&location=${encodeURIComponent("YouTube")}`;
 
   return `
-    <a href="${google}" target="_blank">Add to Google Calendar</a>
+    <a href="${google}" target="_blank" rel="noopener">Add to Google Calendar</a>
     <a href="${icsUrl}" download="livestream.ics">Add to Outlook / Apple Calendar</a>
-    <a href="https://www.youtube.com/channel/${CHANNEL_ID}?sub_confirmation=1">Subscribe</a>
+    <a href="https://www.youtube.com/channel/${CHANNEL_ID}?sub_confirmation=1" target="_blank" rel="noopener">Subscribe to YouTube Channel</a>
   `;
 }
 
 /* =======================
-   COUNTDOWN + LIVE LOGIC
+   COUNTDOWN / LIVE LOGIC
 ======================= */
-
-/* UPDATED: accepts isLive flag */
-function updateStatus(startISO, countdownEl, calendarEl, watchLiveEl, isLive) {
+function updateStatus(startISO, countdownEl, calendarEl, watchLiveEl, isLive, hasEnded) {
+  if (hasEnded) {
+    countdownEl.textContent = "Stream ended";
+    countdownEl.classList.remove("live");
+    calendarEl.style.display = "none";
+    watchLiveEl.style.display = "none";
+    return;
+  }
 
   if (isLive) {
     countdownEl.textContent = "LIVE NOW";
@@ -134,8 +203,11 @@ function updateStatus(startISO, countdownEl, calendarEl, watchLiveEl, isLive) {
   const diff = start - now;
 
   if (diff <= 0) {
+    // Not live yet (or API hasn't flipped), but past scheduled time
     countdownEl.textContent = "Starting…";
     countdownEl.classList.add("live");
+    // Keep calendar visible until it truly flips to LIVE
+    watchLiveEl.style.display = "none";
     return;
   }
 
@@ -149,41 +221,117 @@ function updateStatus(startISO, countdownEl, calendarEl, watchLiveEl, isLive) {
   else text = `Starts in ${mins} minute${mins !== 1 ? "s" : ""}`;
 
   countdownEl.textContent = text;
+  countdownEl.classList.remove("live");
+  calendarEl.style.display = "block";
+  watchLiveEl.style.display = "none";
 }
 
-function startCountdown(startISO, countdownEl, calendarEl, watchLiveEl, isLive) {
-  updateStatus(startISO, countdownEl, calendarEl, watchLiveEl, isLive);
-  setInterval(() => {
-    updateStatus(startISO, countdownEl, calendarEl, watchLiveEl, isLive);
-  }, 60000);
+function startCountdown(startISO, countdownEl, calendarEl, watchLiveEl, stateRef) {
+  // initial paint
+  updateStatus(startISO, countdownEl, calendarEl, watchLiveEl, stateRef.isLive, stateRef.hasEnded);
+
+  // update every minute
+  const id = setInterval(() => {
+    updateStatus(startISO, countdownEl, calendarEl, watchLiveEl, stateRef.isLive, stateRef.hasEnded);
+    if (stateRef.hasEnded) clearInterval(id);
+  }, 60_000);
+}
+
+/**
+ * Lightweight polling to keep LIVE status accurate during the broadcast.
+ * - Activates if we are within 15 minutes before start OR if live already.
+ * - Polls every 60s and stops when the stream ends.
+ */
+function startLiveMonitor(videoId, stateRef, countdownEl, calendarEl, watchLiveEl, startISO) {
+  const shouldMonitor = () => {
+    if (stateRef.hasEnded) return false;
+    if (stateRef.isLive) return true;
+    const now = new Date();
+    const start = new Date(startISO);
+    const diff = start - now;
+    return diff <= 15 * 60 * 1000; // begin monitoring within 15 mins of start
+  };
+
+  if (!shouldMonitor()) return;
+
+  const poll = async () => {
+    try {
+      const url =
+        "https://www.googleapis.com/youtube/v3/videos" +
+        `?part=liveStreamingDetails` +
+        `&id=${videoId}` +
+        `&key=${API_KEY}`;
+
+      const res = await fetch(url);
+      if (!res.ok) return; // silent fail; next tick might work
+      const data = await res.json();
+      const details = data?.items?.[0]?.liveStreamingDetails;
+
+      const isLive =
+        !!details?.concurrentViewers ||
+        (!!details?.actualStartTime && !details?.actualEndTime);
+
+      const hasEnded = !!details?.actualEndTime;
+
+      // Update state + UI immediately
+      stateRef.isLive = isLive;
+      stateRef.hasEnded = hasEnded;
+      updateStatus(startISO, countdownEl, calendarEl, watchLiveEl, stateRef.isLive, stateRef.hasEnded);
+
+      if (hasEnded) {
+        clearInterval(timer);
+      }
+    } catch (e) {
+      // swallow errors; try again next tick
+      // console.error(e);
+    }
+  };
+
+  // initial poll, then every 60s
+  poll();
+  const timer = setInterval(poll, 60_000);
 }
 
 /* =======================
    RENDER
 ======================= */
-function renderStream({ videoId, title, description, thumbnail, startTime, isLive }) {
+function renderStream({ videoId, title, description, startTime, isLiveInitial }) {
   const container = document.getElementById("output");
+
+  // Force high-res 16:9 thumbnails with responsive sources
+  const src320 = `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;       // 320×180
+  const src1280 = `https://i.ytimg.com/vi/${videoId}/hq720.jpg`;          // 1280×720
+  const src1920 = `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`;  // 1920×1080 if available (fallback 1280)
+
+  const imgHTML = `
+    <a href="https://www.youtube.com/watch?v=${videoId}" target="_blank" rel="noopener">
+      <img
+        src="${src1280}"
+        srcset="
+          ${src320} 320w,
+          ${src1280} 1280w,
+          ${src1920} 1920w
+        "
+        sizes="(max-width: 640px) 100vw, 640px"
+        alt=""
+        loading="lazy"
+      />
+    </a>
+  `;
 
   container.innerHTML = `
     <div class="stream">
-      <a href="https://www.youtube.com/watch?v=${videoId}" target="_blank">
-        <img src="${thumbnail}" alt="">
-      </a>
-
+      ${imgHTML}
       <div class="content">
         <div class="title">${title}</div>
         <div class="date">${formatUKDate(startTime)} (UK time)</div>
-
         <div class="countdown" id="countdown"></div>
-
         <div class="description">${truncate(description, DESCRIPTION_LIMIT)}</div>
-
         <div class="calendar" id="calendar">
           ${calendarLinks(title, startTime, videoId)}
         </div>
-
         <div class="watch-live" id="watchLive" style="display:none">
-          <a href="https://www.youtube.com/watch?v=${videoId}&live_chat=1" target="_blank">
+          <a href="https://www.youtube.com/watch?v=${videoId}&live_chat=1" target="_blank" rel="noopener">
             ▶ Watch live on YouTube
           </a>
         </div>
@@ -191,103 +339,122 @@ function renderStream({ videoId, title, description, thumbnail, startTime, isLiv
     </div>
   `;
 
-  startCountdown(
-    startTime,
-    document.getElementById("countdown"),
-    document.getElementById("calendar"),
-    document.getElementById("watchLive"),
-    isLive
-  );
+  const countdownEl = document.getElementById("countdown");
+  const calendarEl = document.getElementById("calendar");
+  const watchLiveEl = document.getElementById("watchLive");
+
+  // Keep live status in a small mutable ref, so countdown + poll can update in sync
+  const stateRef = { isLive: !!isLiveInitial, hasEnded: false };
+
+  // Start countdown ticks (minute-by-minute)
+  startCountdown(startTime, countdownEl, calendarEl, watchLiveEl, stateRef);
+
+  // Begin live monitor shortly before start (or immediately if already live)
+  startLiveMonitor(videoId, stateRef, countdownEl, calendarEl, watchLiveEl, startTime);
 }
 
 /* =======================
-   LOAD NEXT STREAM (FIXED)
+   LOAD STREAM
 ======================= */
 async function loadNextLivestream() {
   if (TEST_MODE) {
     const start = new Date(Date.now() + 10 * 60000).toISOString();
     renderStream({
       videoId: "TEST123",
-      title: "Test Livestream",
-      description: "Development mock stream.",
-      thumbnail: "https://i.ytimg.com/vi/lVL8gN_APZ0/hqdefault.jpg?sqp=-oaymwEnCNACELwBSFryq4qpAxkIARUAAIhCGAHYAQHiAQoIGBACGAY4AUAB&rs=AOn4CLDWnQfwej2fiyMnKagzSn1vDHm9rQ",
+      title: "Test Livestream (Dev Mode)",
+      description: "This is a mock livestream used for development and layout testing.",
       startTime: start,
-      isLive: false
+      isLiveInitial: false
     });
     return;
   }
 
   try {
-    /* 1) FETCH up to 50 UPCOMING scheduled events */
+    // 1) Get up to 50 upcoming items (most recently published) then sort client-side by scheduledStartTime
     const searchUrl =
       "https://www.googleapis.com/youtube/v3/search" +
       `?part=snippet` +
       `&channelId=${CHANNEL_ID}` +
       `&eventType=upcoming` +
       `&type=video` +
+      `&order=date` +     // per your preference: "50 most recently published" is enough
       `&maxResults=50` +
       `&key=${API_KEY}`;
 
-    const sr = await fetch(searchUrl);
-    const sd = await sr.json();
+    const searchRes = await fetch(searchUrl);
+    if (!searchRes.ok) throw new Error(`Search error: ${searchRes.status}`);
+    const searchData = await searchRes.json();
 
-    if (!sd.items || sd.items.length === 0) {
+    if (!searchData.items || searchData.items.length === 0) {
       document.getElementById("output").innerHTML =
-        `<p class="none">No upcoming events currently scheduled.</p>`;
+        `<p class="none">No upcoming events are currently scheduled. Check back soon - new events are added all the time.</p>`;
       return;
     }
 
-    const ids = sd.items.map(i => i.id.videoId).filter(Boolean);
+    const ids = searchData.items.map(i => i?.id?.videoId).filter(Boolean);
+    if (ids.length === 0) {
+      document.getElementById("output").innerHTML =
+        `<p class="none">No upcoming events are currently scheduled. Check back soon - new events are added all the time.</p>`;
+      return;
+    }
 
-    /* 2) FETCH full details */
-    const detailsUrl =
+    // 2) Fetch full details for sorting and status
+    const videoUrl =
       "https://www.googleapis.com/youtube/v3/videos" +
       `?part=snippet,status,liveStreamingDetails` +
       `&id=${ids.join(",")}` +
       `&key=${API_KEY}`;
 
-    const vr = await fetch(detailsUrl);
-    const vd = await vr.json();
+    const videoRes = await fetch(videoUrl);
+    if (!videoRes.ok) throw new Error(`Videos error: ${videoRes.status}`);
+    const videoData = await videoRes.json();
 
-    const now = new Date();
-
-    const candidates = vd.items
+    // 3) Build candidate list
+    const nowISO = new Date().toISOString();
+    const candidates = (videoData.items || [])
+      .filter(v => v?.status?.privacyStatus === "public")
       .map(v => {
-        const sched = v.liveStreamingDetails?.scheduledStartTime;
-        return sched ? {
+        const lsd = v.liveStreamingDetails || {};
+        return {
+          raw: v,
           videoId: v.id,
-          title: v.snippet.title,
-          description: v.snippet.description,
-          thumbnail: (
-            v.snippet.thumbnails.medium?.url ||
-            v.snippet.thumbnails.high?.url ||
-            v.snippet.thumbnails.default?.url
-          ),
-          startTime: sched,
-          isLive: !!v.liveStreamingDetails?.concurrentViewers
-        } : null;
+          title: v.snippet?.title ?? "",
+          description: v.snippet?.description ?? "",
+          scheduledStartTime: lsd?.scheduledStartTime || null,
+          actualStartTime: lsd?.actualStartTime || null,
+          actualEndTime: lsd?.actualEndTime || null,
+          isLiveInitial: !!lsd?.concurrentViewers // present if currently live
+        };
       })
-      .filter(Boolean);
+      .filter(v => !!v.scheduledStartTime);
 
     if (candidates.length === 0) {
       document.getElementById("output").innerHTML =
-        `<p class="none">No upcoming livestreams scheduled.</p>`;
+        `<p class="none">No upcoming events are currently scheduled. Check back soon - new events are added all the time.</p>`;
       return;
     }
 
-    /* 3) PICK earliest scheduled stream */
-    candidates.sort(
-      (a, b) => new Date(a.startTime) - new Date(b.startTime)
-    );
+    // 4) Only consider events scheduled for now or the future (safety guard)
+    const upcoming = candidates
+      .filter(v => v.scheduledStartTime >= nowISO)
+      .sort((a, b) => new Date(a.scheduledStartTime) - new Date(b.scheduledStartTime));
 
-    const next = candidates[0];
+    // Fallback: if none are >= now (rare for 'upcoming'), pick earliest scheduled anyway
+    const pick = upcoming[0] ||
+      candidates.sort((a, b) => new Date(a.scheduledStartTime) - new Date(b.scheduledStartTime))[0];
 
-    renderStream(next);
+    renderStream({
+      videoId: pick.videoId,
+      title: pick.title,
+      description: pick.description,
+      startTime: pick.scheduledStartTime,
+      isLiveInitial: pick.isLiveInitial
+    });
 
-  } catch (e) {
-    console.error(e);
+  } catch (err) {
+    console.error(err);
     document.getElementById("output").innerHTML =
-      `<p class="none">Unable to load livestream information.</p>`;
+      `<p class="none">Sorry, we couldn’t load the next livestream right now.</p>`;
   }
 }
 
