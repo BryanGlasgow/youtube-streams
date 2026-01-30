@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>YouTube Video Details</title>
+
+<!-- PT Sans -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&display=swap" rel="stylesheet">
+
+<style>
+  body {
+    font-family: 'PT Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    margin: 0;
+    padding: 1rem;
+    background: #ffffff;
+  }
+
+  .container {
+    max-width: 640px;
+    margin: 0 auto;
+  }
+
+  .stream {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    overflow: hidden;
+    background: #ffffff;
+  }
+
+  .stream img {
+    width: 100%;
+    display: block;
+    aspect-ratio: 16/9;
+    object-fit: cover;
+    object-position: center;
+  }
+
+  .content {
+    padding: 0.75rem;
+  }
+
+  .title {
+    font-weight: bold;
+    margin-bottom: 0.25rem;
+  }
+
+  .date {
+    font-size: 0.9rem;
+    color: #555;
+  }
+
+  .countdown {
+    margin-top: 0.25rem;
+    font-size: 0.95rem;
+    font-weight: bold;
+    color: #333;
+  }
+
+  .live {
+    color: #cc0000;
+  }
+
+  .description {
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    color: #000000;
+    white-space: pre-wrap;
+  }
+
+  .calendar {
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+  }
+
+  .calendar a {
+    margin-right: 0.75rem;
+    text-decoration: none;
+    color: #005398;
+  }
+
+  .calendar a:hover { text-decoration: underline; }
+
+  .watch-live {
+    margin-top: 0.75rem;
+  }
+
+  .watch-live a {
+    display: inline-block;
+    background: #cc0000;
+    color: #fff;
+    padding: 0.5rem 0.75rem;
+    text-decoration: none;
+    font-weight: bold;
+    border-radius: 3px;
+  }
+
+  .watch-live a:hover { background: #a30000; }
+
+  .none {
+    font-style: italic;
+    color: #666;
+  }
+</style>
+</head>
+
+<body>
+
+<div class="container" id="output">
+  Loading video…
+</div>
+
+<script>
+/* =======================
+   CONFIG
+======================= */
+const API_KEY = "YOUR_API_KEY_HERE"; // Insert your key
+const TIMEZONE = "Europe/London";
+
+/* =======================
+   HELPERS
+======================= */
+function getVideoIdFromQuery() {
+  const p = new URLSearchParams(window.location.search);
+  return p.get("video");
+}
+
+function formatUKDate(iso) {
+  if (!iso) return "";
+  return new Date(iso).toLocaleString("en-GB", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: TIMEZONE
+  });
+}
+
+function calendarLinks(title, startISO, videoId) {
+  const start = new Date(startISO);
+  const end = new Date(start.getTime() + 60 * 60 * 1000);
+
+  const formatICS = d =>
+    d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+
+  const ics = `
+BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+DTSTART:${formatICS(start)}
+DTEND:${formatICS(end)}
+SUMMARY:${title}
+URL:https://www.youtube.com/watch?v=${videoId}
+END:VEVENT
+END:VCALENDAR`;
+
+  const icsBlob = new Blob([ics], { type: "text/calendar" });
+  const icsUrl = URL.createObjectURL(icsBlob);
+
+  const google =
+    "https://www.google.com/calendar/render?action=TEMPLATE" +
+    `&text=${encodeURIComponent(title)}` +
+    `&dates=${formatICS(start)}/${formatICS(end)}` +
+    `&details=${encodeURIComponent("Watch on YouTube")}` +
+    `&location=${encodeURIComponent("YouTube")}`;
+
+  return `
+    ${google}Add to Google Calendar</a>
+    ${icsUrl}Add to Outlook / Apple Calendar</a>
+    https://www.youtube.com/channel/UC7Do00lxLh7l4WwXLl96P5A?sub_confirmation=1Subscribe</a>
+  `;
+}
+
+/* =======================
+   COUNTDOWN / LIVE STATUS
+======================= */
+function updateStatus(startISO, countdownEl, calendarEl, watchLiveEl, isLive, hasEnded) {
+  if (!startISO) {
+    countdownEl.textContent = "";
+    return;
+  }
+
+  if (hasEnded) {
+    countdownEl.textContent = "Stream ended";
+    watchLiveEl.style.display = "none";
+    calendarEl.style.display = "none";
+    return;
+  }
+
+  if (isLive) {
+    countdownEl.textContent = "LIVE NOW";
+    countdownEl.classList.add("live");
+    calendarEl.style.display = "none";
+    watchLiveEl.style.display = "block";
+    return;
+  }
+
+  const now = new Date();
+  const start = new Date(startISO);
+  const diff = start - now;
+
+  if (diff <= 0) {
+    countdownEl.textContent = "Starting…";
+    countdownEl.classList.add("live");
+    return;
+  }
+
+  const mins = Math.floor(diff / 60000);
+  const hrs = Math.floor(mins / 60);
+  const days = Math.floor(hrs / 24);
+
+  let t = "";
+  if (days > 0) t = `Starts in ${days} day${days !== 1 ? "s" : ""}`;
+  else if (hrs > 0) t = `Starts in ${hrs} hour${hrs !== 1 ? "s" : ""}`;
+  else t = `Starts in ${mins} minute${mins !== 1 ? "s" : ""}`;
+
+  countdownEl.textContent = t;
+}
+
+function startCountdown(startISO, countdownEl, calendarEl, watchLiveEl, stateRef) {
+  updateStatus(startISO, countdownEl, calendarEl, watchLiveEl, stateRef.isLive, stateRef.hasEnded);
+  const id = setInterval(() => {
+    updateStatus(startISO, countdownEl, calendarEl, watchLiveEl, stateRef.isLive, stateRef.hasEnded);
+    if (stateRef.hasEnded) clearInterval(id);
+  }, 60000);
+}
+
+function startLiveMonitor(videoId, stateRef, countdownEl, calendarEl, watchLiveEl, startISO) {
+  if (!startISO) return;
+
+  const shouldMonitor = () => {
+    if (stateRef.hasEnded) return false;
+    if (stateRef.isLive) return true;
+
+    const diff = new Date(startISO) - new Date();
+    return diff <= 900000; // Start 15m before
+  };
+
+  if (!shouldMonitor()) return;
+
+  const poll = async () => {
+    try {
+      const res = await fetch(
+        `https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id=${videoId}&key=${API_KEY}`
+      );
+
+      const data = await res.json();
+      const lsd = data.items?.[0]?.liveStreamingDetails || {};
+
+      const live = !!lsd.concurrentViewers || (!!lsd.actualStartTime && !lsd.actualEndTime);
+      const ended = !!lsd.actualEndTime;
+
+      stateRef.isLive = live;
+      stateRef.hasEnded = ended;
+
+      updateStatus(startISO, countdownEl, calendarEl, watchLiveEl, live, ended);
+      if (ended) clearInterval(timer);
+    } catch {}
+  };
+
+  poll();
+  const timer = setInterval(poll, 60000);
+}
+
+/* =======================
+   RENDER
+======================= */
+function renderVideo(v) {
+  const container = document.getElementById("output");
+
+  const {
+    videoId,
+    title,
+    description,
+    scheduledStartTime,
+    actualStartTime,
+    actualEndTime,
+    isLiveInitial
+  } = v;
+
+  const hasLiveData = !!scheduledStartTime || !!actualStartTime || !!actualEndTime;
+
+  const thumbnail = `https://i.ytimg.com/vi/${videoId}/hq720.jpg`;
+
+  container.innerHTML = `
+    <div class="stream">
+      https://www.youtube.com/watch?v=${videoId}
+        ${thumbnail}
+      </a>
+
+      <div class="content">
+        <div class="title">${title}</div>
+
+        <div class="date">
+          ${hasLiveData
+            ? `${formatUKDate(scheduledStartTime || actualStartTime)} (UK time)`
+            : `Published on ${formatUKDate(v.publishedAt)}`
+          }
+        </div>
+
+        <div class="countdown" id="countdown"></div>
+
+        <div class="description">${description}</div>
+
+        <div class="calendar" id="calendar" style="${hasLiveData ? "" : "display:none"}">
+          ${scheduledStartTime ? calendarLinks(title, scheduledStartTime, videoId) : ""}
+        </div>
+
+        <div class="watch-live" id="watchLive" style="display:none">
+          https://www.youtube.com/watch?v=${videoId}&live_chat=1
+            ▶ Watch live on YouTube
+          </a>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const countdownEl = document.getElementById("countdown");
+  const calendarEl = document.getElementById("calendar");
+  const watchLiveEl = document.getElementById("watchLive");
+
+  const stateRef = { isLive: isLiveInitial, hasEnded: !!actualEndTime };
+
+  if (hasLiveData) {
+    startCountdown(scheduledStartTime, countdownEl, calendarEl, watchLiveEl, stateRef);
+    startLiveMonitor(videoId, stateRef, countdownEl, calendarEl, watchLiveEl, scheduledStartTime);
+  }
+}
+
+/* =======================
+   LOAD VIDEO
+======================= */
+async function loadVideo() {
+  const videoId = getVideoIdFromQuery();
+  const out = document.getElementById("output");
+
+  if (!videoId) {
+    out.innerHTML = `<p class="none">No video ID supplied in the URL.</p>`;
+    return;
+  }
+
+  try {
+    const url =
+      "https://www.googleapis.com/youtube/v3/videos" +
+      `?part=snippet,status,liveStreamingDetails` +
+      `&id=${videoId}` +
+      `&key=${API_KEY}`;
+
+    const res = await fetch(url);
+    const data = await res.json();
+    const v = data.items?.[0];
+
+    if (!v) {
+      out.innerHTML = `<p class="none">Invalid video ID or video not found.</p>`;
+      return;
+    }
+
+    const lsd = v.liveStreamingDetails || {};
+
+    const mapped = {
+      videoId,
+      title: v.snippet.title,
+      description: v.snippet.description,
+      publishedAt: v.snippet.publishedAt,
+      scheduledStartTime: lsd.scheduledStartTime || null,
+      actualStartTime: lsd.actualStartTime || null,
+      actualEndTime: lsd.actualEndTime || null,
+      isLiveInitial: !!lsd.concurrentViewers
+    };
+
+    renderVideo(mapped);
+
+  } catch (err) {
+    console.error(err);
+    out.innerHTML = `<p class="none">Unable to load video details.</p>`;
+  }
+}
+
+loadVideo();
+</script>
+
+</body>
+</html>
