@@ -138,19 +138,17 @@
 /* =======================
    CONFIG
 ======================= */
-const API_KEY = "AIzaSyDvflaf2WrXoTPnj1-cDHYWhCD_pMJnhoY"; // <-- Put your actual key here
+const API_KEY = "AIzaSyDvflaf2WrXoTPnj1-cDHYWhCD_pMJnhoY"; // <-- Put your actual YouTube Data API v3 key here
 const TIMEZONE = "Europe/London";
 
 /* =======================
    URL PARAM PARSER
-   - supports ?video=ID or full youtube URLs
+   - supports ?video=ID or full YouTube URLs
 ======================= */
 function getVideoIdFromQuery() {
   const p = new URLSearchParams(window.location.search);
   let v = p.get("video");
-
   if (!v) return null;
-
   v = v.trim();
 
   // Accept full YouTube URLs too
@@ -163,12 +161,11 @@ function getVideoIdFromQuery() {
       }
       const idParam = url.searchParams.get("v");
       if (idParam) return idParam.trim();
-      // Handle other paths: /live/<id>, etc.
+      // Fallback for other path styles
       const parts = url.pathname.split("/").filter(Boolean);
       if (parts.length) return parts[parts.length - 1];
     } catch {}
   }
-
   return v;
 }
 
@@ -214,9 +211,9 @@ END:VCALENDAR`.trim();
     `&location=${encodeURIComponent("YouTube")}`;
 
   return `
-    <a href="${google}" target="_blank" rel="noopener noreferrer">Add to Google Calendar</a>
+    <a href="${google}" target="_blank" rel="noopener">Add to Google Calendar</a>
     <a href="${icsUrl}" download="livestream.ics">Add to Outlook / Apple Calendar</a>
-    <a href="https://www.youtube.com/channel/UC7Do00lxLh7l4WwXLl96P5A?sub_confirmation=1" target="_blank" rel="noopener noreferrer">Subscribe</a>
+    <a href="https://www.youtube.com/channel/UC7Do00lxLh7l4WwXLl96P5A?sub_confirmation=1" target="_blank" rel="noopener">Subscribe</a>
   `;
 }
 
@@ -449,7 +446,7 @@ function renderVideo(v) {
     actualStartTime,
     actualEndTime,
     isLiveInitial,
-    apiThumb /* always present from API selection */
+    apiThumb /* always present from API thumbnails */
   } = v;
 
   const hasLiveData = !!scheduledStartTime || !!actualStartTime || !!actualEndTime;
@@ -463,13 +460,13 @@ function renderVideo(v) {
 
   container.innerHTML = `
     <div class="stream">
-      <a href="https://www.youtube.com/watch?v=${videoId}" target="_blank" rel="noopener noreferrer">
+      <a href="https://www.youtube.com/watch?v=${videoId}" target="_blank" rel="noopener">
         <img
           src="${maxres}"
           data-fallback1="${hq720}"
           data-fallback2="${apiThumb}"
           onerror="imgFallback(this)"
-          alt=""
+          alt="${title.replace(/"/g, '&quot;')}"
         >
       </a>
 
@@ -488,7 +485,7 @@ function renderVideo(v) {
 
         <!-- Prominent Watch on YouTube button (Option A, bottom above description) -->
         <div class="watch-yt">
-          <a class="yt-button" href="https://www.youtube.com/watch?v=${videoId}" target="_blank" rel="noopener noreferrer">
+          <a class="yt-button" href="https://www.youtube.com/watch?v=${videoId}" target="_blank" rel="noopener">
             ▶ Watch on YouTube
           </a>
         </div>
@@ -503,7 +500,23 @@ function renderVideo(v) {
         </div>
 
         <div class="watch-live" id="watchLive" style="display:none">
-          <a href="httpseRef, countdownEl, calendarEl, watchLiveEl, scheduledStartTime);
+          <a href="https://www.youtube.com/watch?v=${videoId}&live_chat=1" target="_blank" rel="noopener">
+            ▶ Watch live on YouTube
+          </a>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const countdownEl = document.getElementById("countdown");
+  const calendarEl = document.getElementById("calendar");
+  const watchLiveEl = document.getElementById("watchLive");
+
+  const stateRef = { isLive: isLiveInitial, hasEnded: !!actualEndTime };
+
+  if (hasLiveData) {
+    startCountdown(scheduledStartTime, countdownEl, calendarEl, watchLiveEl, stateRef);
+    startLiveMonitor(videoId, stateRef, countdownEl, calendarEl, watchLiveEl, scheduledStartTime);
   }
 }
 
@@ -515,28 +528,7 @@ async function loadVideo() {
   const out = document.getElementById("output");
 
   if (!videoId) {
-    out.innerHTML = `<p class="none">No video ID supplied in the URL. Try <code>?video=GEGk9PcSF9g</code></p>`;
-    return;
-  }
-
-  try {
-    const url =
-      "https://www.googleapis.com/youtube/v3/videos" +
-      `?part=snippet,status,liveStreamingDetails` +
-      `&id=${videoId}` +
-      `&key=${API_KEY}`;
-
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`YouTube API error ${res.status}`);
-    const data = await res.json();
-    const v = data.items?.[0];
-
-    if (!v) {
-      out.innerHTML = `<p class="none">Invalid video ID or video not found.</p>`;
-      return;
-    }
-
-    const lsd = v.liveStreamingDetails || {};
+    out.innerHTML = `<p class="none">No video ID supplied inStreamingDetails || {};
     const thumbs = v.snippet?.thumbnails || {};
 
     // API-provided thumbnail fallback that always exists
