@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>UofG Pre‑Sessional Course Start Calculator</title>
+<style>
+  :root{
+    --bg:#0b1526; --card:#ffffff; --ink:#0e1726; --muted:#4a5568; --uofg:#005f83;
+  }
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:#fff;margin:0;padding:40px 16px;}
+  .wrap{max-width:980px;margin:0 auto;}
+  .card{background:var(--card);color:var(--ink);border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.25);padding:24px;}
+  h1{margin:.2em 0 .4em;font-size:1.6rem;color:var(--card)}
+  h2{margin:0 0 12px;font-size:1.25rem}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+  label{font-weight:600;font-size:.95rem}
+  select,input{width:100%;padding:10px;border:1px solid #cbd5e0;border-radius:10px;font-size:1rem}
+  button{background:var(--uofg);color:#fff;border:none;border-radius:10px;padding:12px 18px;font-size:1rem;font-weight:700;cursor:pointer;margin-top:18px}
+  button:hover{background:#024b66}
+  .result{margin-top:20px;padding:16px;border-left:4px solid var(--uofg);background:#f8fafc;border-radius:8px}
+  .muted{color:var(--muted);font-size:.9rem}
+  .foot{margin-top:14px;font-size:.85rem;color:#334155}
+  code.small{background:#f1f5f9;padding:2px 6px;border-radius:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Pre‑Sessional Course Start Calculator — University of Glasgow</h1>
+
+  <div class="card">
+    <h2>1) Choose your target IELTS requirement</h2>
+    <select id="target">
+      <option value="60-overall">IELTS 6.0 overall</option>
+      <option value="65-overall">IELTS 6.5 overall</option>
+      <option value="65-overall-writing-conds">IELTS 6.5 overall (writing rule)</option>
+      <option value="65-every">IELTS 6.5 in every skill</option>
+      <option value="70-overall">IELTS 7.0 overall</option>
+      <option value="70-every">IELTS 7.0 in every skill</option>
+    </select>
+
+    <h2 style="margin-top:18px;">2) Enter your current IELTS scores</h2>
+    <div class="grid">
+      <div><label for="L">Listening</label><input id="L" type="number" step="0.5" min="0" max="9"></div>
+      <div><label for="R">Reading</label><input id="R" type="number" step="0.5" min="0" max="9"></div>
+      <div><label for="W">Writing</label><input id="W" type="number" step="0.5" min="0" max="9"></div>
+      <div><label for="S">Speaking</label><input id="S" type="number" step="0.5" min="0" max="9"></div>
+    </div>
+
+    <p class="muted">Average is rounded using IELTS rules: .25 → next .5, .75 → next .0.</p>
+
+    <button id="go">Check Start Date</button>
+
+    <div id="result" class="result" style="display:none"></div>
+
+    <div class="foot">
+      Rules sourced from official UofG tables:
+      6.0 overall [1](https://www.gla.ac.uk/international/englishlanguage/requirements/) ·
+      6.5 overall [1](https://www.gla.ac.uk/international/englishlanguage/requirements/) ·
+      6.5 overall (writing conditions) [1](https://www.gla.ac.uk/international/englishlanguage/requirements/) ·
+      6.5 in every skill [1](https://www.gla.ac.uk/international/englishlanguage/requirements/) ·
+      7.0 overall [2](https://www.gla.ac.uk/schools/mlc/eas/) ·
+      7.0 in every skill [3](https://www.gla.ac.uk/)
+    </div>
+  </div>
+</div>
+
+<script>
+/* -------------------------------------------------------
+   IELTS ROUNDING (updated): .25 → next .5, .75 → next .0
+------------------------------------------------------- */
+function roundIeltsOverall(avg){
+  const eps = 1e-9;
+  const base = Math.floor(avg);
+  const frac = avg - base;
+
+  const near = (a,b)=>Math.abs(a-b)<0.001+eps;
+
+  if(near(frac,0.25)) return base + 0.5;
+  if(near(frac,0.75)) return base + 1.0;
+
+  return Math.round(avg*2)/2;
+}
+
+function overallFrom(L,R,W,S){
+  return roundIeltsOverall((L+R+W+S)/4);
+}
+
+/* -------------------------------------------------------
+   Utilities
+------------------------------------------------------- */
+const allAtLeast = (arr,n)=>arr.every(v=>v>=n);
+const noneBelow  = (arr,n)=>arr.every(v=>v>=n);
+const countEq     = (arr,n)=>arr.filter(v=>v===n).length;
+const countAtLeast=(arr,n)=>arr.filter(v=>v>=n).length;
+
+/* -------------------------------------------------------
+   FULL RULESETS (all 6 categories)
+   Sourced from:
+   - 6.0 overall          ([1](https://www.gla.ac.uk/international/englishlanguage/requirements/))
+   - 6.5 overall          ([1](https://www.gla.ac.uk/international/englishlanguage/requirements/))
+   - 6.5 overall (writing)([1](https://www.gla.ac.uk/international/englishlanguage/requirements/))
+   - 6.5 every skill      ([1](https://www.gla.ac.uk/international/englishlanguage/requirements/))
+   - 7.0 overall          ([2](https://www.gla.ac.uk/schools/mlc/eas/))
+   - 7.0 every skill      ([3](https://www.gla.ac.uk/))
+------------------------------------------------------- */
+const RULES = {
+  "60-overall":[
+    { test:({L,R,W,S,O})=>O>=6&&W>=6&&noneBelow([L,R,W,S],5.5), result:"July Entry" },
+    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5.5), result:"June Entry" },
+    { test:({L,R,W,S,O})=>O>=5.5&&W>=5.5&&noneBelow([L,R,W,S],5.0), result:"May Entry" },
+    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5.0), result:"April Entry" },
+    { test:({L,R,W,S,O})=>O>=5&&W>=5&&noneBelow([L,R,W,S],4.5), result:"February Entry" },
+    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],4.5), result:"January Entry" }
+  ],
+
+  "65-overall":[
+    { test:({L,R,W,S,O})=>O>=6.5&&W>=6&&noneBelow([L,R,W,S],5.5)&&countEq([L,R,W,S],5.5)<=1, result:"July Entry" },
+    { test:({L,R,W,S,O})=>O>=6&&((W>=6&&noneBelow([L,R,W,S],5.5))||(W===5.5&&countAtLeast([L,R,S],6)>=3)), result:"June Entry" },
+    { test:({L,R,W,S,O})=>O>=5.5&&W===5.5&&noneBelow([L,R,W,S],5)&&countEq([L,R,W,S],5)<=1, result:"May Entry" },
+    { test:({L,R,W,S,O})=>O>=5.5&&((W>=5.5&&noneBelow([L,R,W,S],5))||(W===5&&countAtLeast([L,R,S],5.5)>=3)), result:"April Entry" },
+    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5), result:"February Entry" },
+    { test:({L,R,W,S,O})=>O>=5&&W>=5&&noneBelow([L,R,W,S],4.5), result:"January Entry" }
+  ],
+
+  "65-overall-writing-conds":[
+    { test:({L,R,W,S,O})=>O>=6.5&&((W>=6.5&&countEq([L,R,W,S],5.5)<=1&&noneBelow([L,R,W,S],5.5))||(W===6&&countAtLeast([L,R,S],6.5)>=2&&noneBelow([L,R,W,S],6))), result:"July Entry" },
+    { test:({L,R,W,S,O})=>O>=6&&((W>=6&&countEq([L,R,W,S],5.5)===1&&noneBelow([L,R,W,S],5.5))||(W===5.5&&countAtLeast([L,R,S],6.5)>=1&&noneBelow([L,R,W,S],6))), result:"June Entry" },
+    { test:({L,R,W,S,O})=>O>=5.5&&W>=5.5&&(noneBelow([L,R,W,S],5.5)||(countAtLeast([L,R,S],6)>=1&&countEq([L,R,W,S],5)<=1)), result:"May Entry" },
+    { test:({L,R,W,S,O})=>O>=5.5&&((W>=5.5&&countEq([L,R,W,S],5)<=1)||(W===5&&countAtLeast([L,R,S],6)>=1&&noneBelow([L,R,W,S],5.5))), result:"April Entry" },
+    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5), result:"February Entry" },
+    { test:({L,R,W,S,O})=>O>=5&&noneBelow([L,R,W,S],4.5)&&((W>=5&&countEq([L,R,W,S],4.5)<=1)||(W===4.5&&countAtLeast([L,R,S],5.5)>=1&&noneBelow([L,R,S],5))), result:"January Entry" }
+  ],
+
+  "65-every":[
+    { test:({L,R,W,S,O})=>O>=6.5&&W>=6.5&&countEq([L,R,W,S],6)<=1&&noneBelow([L,R,W,S],6), result:"July Entry" },
+    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],6), result:"June Entry" },
+    { test:({L,R,W,S,O})=>O>=6&&W>=6&&noneBelow([L,R,W,S],5.5), result:"May Entry" },
+    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5.5), result:"April Entry" },
+    { test:({L,R,W,S,O})=>O>=5.5&&W>=5.5&&noneBelow([L,R,W,S],5), result:"February Entry" },
+    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5), result:"January Entry" }
+  ],
+
+  "70-overall":[
+    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],6.5), result:"July Entry" },
+    { test:({L,R,W,S,O})=>O>=6.5&&W>=6.5&&noneBelow([L,R,W,S],6), result:"June Entry" },
+    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],6), result:"May Entry" },
+    { test:({L,R,W,S,O})=>O>=6&&W>=6&&noneBelow([L,R,W,S],5.5), result:"April Entry" },
+    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5.5), result:"February Entry" },
+    { test:({L,R,W,S,O})=>O>=5.5&&W>=5.5&&noneBelow([L,R,W,S],5), result:"January Entry" }
+  ],
+
+  "70-every":[
+    { test:({L,R,W,S,O})=>O>=7&&W>=7&&noneBelow([L,R,W,S],6.5), result:"July Entry" },
+    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],6.5), result:"June Entry" },
+    { test:({L,R,W,S,O})=>O>=6.5&&W>=6.5&&noneBelow([L,R,W,S],6), result:"May Entry" },
+    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],6), result:"April Entry" },
+    { test:({L,R,W,S,O})=>O>=6&&W>=6&&noneBelow([L,R,W,S],5.5), result:"February Entry" },
+    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5.5), result:"January Entry" }
+  ]
+};
+
+/* -------------------------------------------------------
+   UI Logic
+------------------------------------------------------- */
+const $ = id => document.getElementById(id);
+
+$("go").addEventListener("click",()=>{
+  const L = parseFloat($("L").value);
+  const R = parseFloat($("R").value);
+  const W = parseFloat($("W").value);
+  const S = parseFloat($("S").value);
+
+  if([L,R,W,S].some(v=>isNaN(v))){
+    $("result").style.display="block";
+    $("result").innerHTML="Please enter all four skills.";
+    return;
+  }
+
+  const O = overallFrom(L,R,W,S);
+
+  const scores={L,R,W,S,O};
+  const rules = RULES[$("target").value];
+  const match = rules.find(r=>r.test(scores));
+
+  $("result").style.display="block";
+
+  if(match){
+    $("result").innerHTML=`<strong>${match.result}</strong><br>
+      <span class="muted">Computed overall: <code class="small">${O.toFixed(1)}</code></span>`;
+  } else {
+    $("result").innerHTML=`No exact match in official tables.<br>
+      <span class="muted">Overall: ${O.toFixed(1)} — please contact EAS for guidance.</span>`;
+  }
+});
+</script>
+
+</body>
+</html>
