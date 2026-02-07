@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Livestreams (Combined, Cached, Zero Polling)</title>
+
+<!-- PT Sans -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&display=swap" rel="stylesheet" />
+
+<style>
+  body {
+    font-family: 'PT Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    margin: 0;
+    padding: 1rem;
+    background: #ffffff;
+  }
+
+  /* ============================
+     NEXT EVENT WIDGET
+  ============================ */
+  .container {
+    max-width: 680px;
+    margin: 0 auto 2rem auto;
+  }
+
+  .stream {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    overflow: hidden;
+    background: #ffffff;
+  }
+
+  .stream img {
+    width: 100%;
+    display: block;
+    aspect-ratio: 16/9;
+    object-fit: cover;
+    object-position: center;
+  }
+
+  .content {
+    padding: 0.75rem;
+  }
+
+  .title {
+    font-weight: bold;
+    margin-bottom: 0.25rem;
+  }
+
+  .date {
+    font-size: 0.9rem;
+    color: #555;
+  }
+
+  .countdown {
+    margin-top: 0.25rem;
+    font-size: 0.95rem;
+    font-weight: bold;
+    color: #333;
+  }
+
+  .live {
+    color: #cc0000;
+  }
+
+  .description {
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    color: #000000;
+  }
+
+  .calendar {
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+  }
+
+  .calendar a {
+    margin-right: 0.75rem;
+    text-decoration: none;
+    color: #005398;
+  }
+
+  .calendar a:hover {
+    text-decoration: underline;
+  }
+
+  .watch-live {
+    margin-top: 0.75rem;
+  }
+
+  .watch-live a {
+    display: inline-block;
+    background: #cc0000;
+    color: #fff;
+    padding: 0.5rem 0.75rem;
+    text-decoration: none;
+    font-weight: bold;
+    border-radius: 3px;
+  }
+
+  .watch-live a:hover {
+    background: #a30000;
+  }
+
+  .none {
+    font-style: italic;
+    color: #666;
+  }
+
+  #toggleDesc {
+    display: inline-block;
+    margin-top: 0.25rem;
+    color: #005398;
+    cursor: pointer;
+    text-decoration: none;
+    font-size: 0.9rem;
+  }
+
+  #toggleDesc:hover {
+    text-decoration: underline;
+  }
+
+  /* ============================
+     GRIDS
+  ============================ */
+  h3 {
+    margin-top: 2rem;
+    font-size: 1.25rem;
+  }
+
+  .stream-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .stream-card {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    overflow: hidden;
+    text-decoration: none;
+    color: #000;
+    background: #fafafa;
+    display: block;
+  }
+
+  .stream-card img {
+    width: 100%;
+    display: block;
+  }
+
+  .stream-card-content {
+    padding: 0.75rem;
+  }
+
+  .stream-card-title {
+    font-weight: bold;
+    margin-bottom: 0.25rem;
+  }
+
+  .stream-card-date {
+    font-size: 0.85rem;
+    color: #555;
+  }
+
+  .message {
+    grid-column: 1 / -1;
+    color: #555;
+    padding: 0.5rem 0;
+  }
+</style>
+</head>
+
+<body>
+
+<!-- NEXT EVENT WIDGET -->
+<div class="container" id="nextEventOutput">Loading next livestream…</div>
+
+<!-- UPCOMING -->
+<h3>Upcoming Events</h3>
+<p><em>Choose an event and click “Notify me” to get a reminder when it goes live.</em></p>
+<div id="upcoming" class="stream-list"></div>
+
+<!-- PAST -->
+<h3>Previous Events</h3>
+<p><em>Catch up with recordings of past livestreams.</em></p>
+<div id="past" class="stream-list"></div>
+
+<script>
+/* ===========================================
+   CONFIG
+=========================================== */
+const API_KEY = "AIzaSyDvflaf2WrXoTPnj1-cDHYWhCD_pMJnhoY";
+const PLAYLIST_ID = "PLchy_nZQAZtAIkcBQ3sMEQgLfoF48-FiV";
+const CACHE_KEY = "ytLivestreamCache_v1";
+const CACHE_DURATION_MS = 30 * 60 * 1000; // 30 minutes
+
+const TIMEZONE = "Europe/London";
+const DESCRIPTION_LIMIT = 200;
+
+/* ===========================================
+   UTILITIES
+=========================================== */
+
+function formatUKDate(iso) {
+  return new Date(iso).toLocaleString("en-GB", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: TIMEZONE
+  });
+}
+
+function truncate(text, max) {
+  if (!text) return "";
+  return text.length > max ? text.substring(0, max) + "…" : text;
+}
+
+/* ===========================================
+   CALENDAR LINKS
+=========================================== */
+function calendarLinks(title, startISO, videoId) {
+  const start = new Date(startISO);
+  const end = new Date(start.getTime() + 60 * 60 * 1000);
+
+  const iso = d => d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+
+  const ics =
+`BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+DTSTART:${iso(start)}
+DTEND:${iso(end)}
+SUMMARY:${title}
+URL:https://www.youtube.com/watch?v=${videoId}
+END:VEVENT
+END:VCALENDAR`;
+
+  const icsBlob = new Blob([ics], { type: "text/calendar" });
+  const icsUrl = URL.createObjectURL(icsBlob);
+
+  const google =
+    "https://www.google.com/calendar/render?action=TEMPLATE" +
+    `&text=${encodeURIComponent(title)}` +
+    `&dates=${iso(start)}/${iso(end)}` +
+    `&details=${encodeURIComponent("Watch on YouTube")}` +
+    `&location=${encodeURIComponent("YouTube")}`;
+
+  return `
+    <a href="${google}" target="_blank">Add to Google Calendar</a>
+    <a href="${icsUrl}" download="livestream.ics">Add to Outlook / Apple Calendar</a>
+    <a href="https://www.youtube.com/channel/UC7Do00lxLh7l4WwXLl96P5A?sub_confirmation=1">Subscribe to YouTube Channel</a>
+  `;
+}
+
+/* ===========================================
+   LOAD FROM CACHE OR API
+=========================================== */
+async function getCachedData() {
+  const cached = localStorage.getItem(CACHE_KEY);
+  if (cached) {
+    try {
+      const parsed = JSON.parse(cached);
+      if (Date.now() - parsed.timestamp < CACHE_DURATION_MS) {
+        return parsed.data;
+      }
+    } catch (e) {}
+  }
+
+  const fresh = await fetchFromYouTube();
+  localStorage.setItem(
+    CACHE_KEY,
+    JSON.stringify({ timestamp: Date.now(), data: fresh })
+  );
+  return fresh;
+}
+
+/* ===========================================
+   FETCH FROM YOUTUBE (PLAYLIST + VIDEO DETAILS)
+=========================================== */
+async function fetchFromYouTube() {
+  // STEP 1: Playlist items
+  const plURL =
+    "https://www.googleapis.com/youtube/v3/playlistItems" +
+    `?part=snippet,contentDetails` +
+    `&playlistId=${PLAYLIST_ID}` +
+    `&maxResults=50` +
+    `&key=${API_KEY}`;
+
+  const plRes = await fetch(plURL);
+  const plData = await plRes.json();
+
+  const videoIds = (plData.items || [])
+    .map(i => i.contentDetails?.videoId)
+    .filter(Boolean);
+
+  if (videoIds.length === 0) return [];
+
+  // STEP 2: Video details
+  const vidURL =
+    "https://www.googleapis.com/youtube/v3/videos" +
+    `?part=snippet,liveStreamingDetails,status` +
+    `&id=${videoIds.join(",")}` +
+    `&key=${API_KEY}`;
+
+  const vidRes = await fetch(vidURL);
+  const vidData = await vidRes.json();
+
+  return vidData.items || [];
+}
+
+/* ===========================================
+   RENDER NEXT EVENT WIDGET (WITHOUT POLLING)
+=========================================== */
+function renderNextEvent(event) {
+  const videoId = event.videoId;
+  const title = event.title;
+  const description = event.description;
+  const startTime = new Date(event.startTime);
+
+  const container = document.getElementById("nextEventOutput");
+
+  const src1280 = `https://i.ytimg.com/vi/${videoId}/hq720.jpg`;
+
+  container.innerHTML = `
+    <div class="stream">
+      <a href="https://www.youtube.com/watch?v=${videoId}" target="_blank">
+        <img src="${src1280}" alt="">
+      </a>
+
+      <div class="content">
+        <div class="title">${title}</div>
+        <div class="date">${formatUKDate(startTime)} (UK time)</div>
+        <div class="countdown" id="countdown"></div>
+
+        <div class="description" id="desc">
+          ${
+            description.length > DESCRIPTION_LIMIT
+              ? `
+                <span id="shortDesc">${truncate(description, DESCRIPTION_LIMIT)}</span>
+                <span id="fullDesc" style="display:none">${description}</span>
+                <a href="#" id="toggleDesc">Show more</a>
+              `
+              : description
+          }
+        </div>
+
+        <div class="calendar" id="calendar">
+          ${calendarLinks(title, startTime, videoId)}
+        </div>
+
+        <div class="watch-live" id="watchLive" style="display:none">
+          <a href="https://www.youtube.com/watch?v=${videoId}&live_chat=1" target="_blank">
+            ▶ Watch live on YouTube
+          </a>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const countdownEl = document.getElementById("countdown");
+  const watchLiveEl = document.getElementById("watchLive");
+  const calendarEl = document.getElementById("calendar");
+
+  // ZERO POLLING:
+  // LIVE NOW = when scheduled start time is reached or passed
+  function updateCountdown() {
+    const now = new Date();
+    if (now >= startTime) {
+      countdownEl.textContent = "LIVE NOW";
+      countdownEl.classList.add("live");
+      watchLiveEl.style.display = "block";
+      calendarEl.style.display = "none";
+      return;
+    }
+
+    const diff = startTime - now;
+    const mins = Math.floor(diff / 60000);
+    const hrs = Math.floor(mins / 60);
+    const days = Math.floor(hrs / 24);
+
+    let text;
+    if (days > 0) text = `Starts in ${days} day${days !== 1 ? "s" : ""}`;
+    else if (hrs > 0) text = `Starts in ${hrs} hour${hrs !== 1 ? "s" : ""}`;
+    else text = `Starts in ${mins} minute${mins !== 1 ? "s" : ""}`;
+
+    countdownEl.textContent = text;
+  }
+
+  updateCountdown();
+  setInterval(updateCountdown, 60000);
+
+  // DESCRIPTION TOGGLE
+  const toggle = document.getElementById("toggleDesc");
+  if (toggle) {
+    const shortEl = document.getElementById("shortDesc");
+    const fullEl = document.getElementById("fullDesc");
+
+    toggle.addEventListener("click", (e) => {
+      e.preventDefault();
+      const expanded = fullEl.style.display === "inline";
+
+      if (expanded) {
+        fullEl.style.display = "none";
+        shortEl.style.display = "inline";
+        toggle.textContent = "Show more";
+      } else {
+        fullEl.style.display = "inline";
+        shortEl.style.display = "none";
+        toggle.textContent = "Show less";
+      }
+    });
+  }
+}
+
+/* ===========================================
+   RENDER GRID CARD
+=========================================== */
+function createCard(video, dateIso) {
+  const videoId = video.videoId;
+  const title = video.title;
+  const date = dateIso;
+
+  const thumb =
+    video.thumbnails?.medium?.url ||
+    video.thumbnails?.high?.url ||
+    video.thumbnails?.default?.url ||
+    `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`;
+
+  const link = document.createElement("a");
+  link.className = "stream-card";
+  link.href = `https://www.youtube.com/watch?v=${videoId}`;
+  link.target = "_blank";
+
+  link.innerHTML = `
+    <img src="${thumb}">
+    <div class="stream-card-content">
+      <div class="stream-card-title">${title}</div>
+      <div class="stream-card-date">${formatUKDate(date)}</div>
+    </div>
+  `;
+
+  return link;
+}
+
+/* ===========================================
+   MAIN DATA FLOW
+=========================================== */
+function processAll(videos) {
+  const now = new Date();
+
+  const all = videos
+    .filter(v => v.status?.privacyStatus === "public")
+    .map(v => ({
+      videoId: v.id,
+      title: v.snippet.title,
+      description: v.snippet.description || "",
+      thumbnails: v.snippet.thumbnails || {},
+      scheduledStartTime: v.liveStreamingDetails?.scheduledStartTime || null,
+      actualStartTime: v.liveStreamingDetails?.actualStartTime || null,
+      actualEndTime: v.liveStreamingDetails?.actualEndTime || null
+    }));
+
+  // UPCOMING
+  const upcoming = all
+    .filter(v => v.scheduledStartTime && new Date(v.scheduledStartTime) >= now)
+    .sort((a, b) => new Date(a.scheduledStartTime) - new Date(b.scheduledStartTime));
+
+  // PAST
+  const past = all
+    .filter(v =>
+      (v.actualStartTime && new Date(v.actualStartTime) < now) ||
+      v.actualEndTime
+    )
+    .sort((a, b) => {
+      const aDate = new Date(a.actualStartTime || a.scheduledStartTime);
+      const bDate = new Date(b.actualStartTime || b.scheduledStartTime);
+      return bDate - aDate;
+    });
+
+  // NEXT EVENT
+  const nextEvent = upcoming[0] || past[past.length - 1];
+  if (nextEvent) {
+    renderNextEvent({
+      videoId: nextEvent.videoId,
+      title: nextEvent.title,
+      description: nextEvent.description,
+      startTime: nextEvent.scheduledStartTime || nextEvent.actualStartTime
+    });
+  } else {
+    document.getElementById("nextEventOutput").innerHTML =
+      `<p class="none">No livestreams available.</p>`;
+  }
+
+  // Render UPCOMING GRID
+  const upEl = document.getElementById("upcoming");
+  upEl.innerHTML = "";
+  if (upcoming.length === 0) {
+    upEl.innerHTML =
+      `<div class="message">We regularly add new events. Please check back soon.</div>`;
+  } else {
+    upcoming.forEach(v =>
+      upEl.appendChild(
+        createCard(v, v.scheduledStartTime)
+      )
+    );
+  }
+
+  // Render PAST GRID
+  const pastEl = document.getElementById("past");
+  pastEl.innerHTML = "";
+  if (past.length === 0) {
+    pastEl.innerHTML = `<div class="message">No previous events found.</div>`;
+  } else {
+    past.forEach(v =>
+      pastEl.appendChild(
+        createCard(v, v.actualStartTime || v.scheduledStartTime)
+      )
+    );
+  }
+}
+
+/* ===========================================
+   INIT
+=========================================== */
+getCachedData().then(processAll);
+</script>
+
+</body>
+</html>
