@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Livestreams List</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root { color-scheme: light; }
+  body { margin:0; background:#fff; font-family:'PT Sans', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; }
+  .wrap { padding: 1rem; }
+
+  h3 { margin: 1.25rem 0 .5rem; font-size:1.25rem; }
+  .stream-list {
+    display:grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap:1rem;
+    margin-bottom: 1rem;
+  }
+  .stream-card {
+    border:1px solid #ddd; border-radius:4px; overflow:hidden;
+    display:block; text-decoration:none; color:#000; background:#fafafa;
+  }
+  .stream-card img { width:100%; display:block; }
+  .stream-card-content { padding:.75rem; }
+  .stream-card-title { font-weight:700; margin-bottom:.25rem; }
+  .stream-card-date { font-size:.85rem; color:#555; }
+  .message { color:#555; padding:.5rem 0; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h3>Upcoming Events</h3>
+    <div id="upcoming" class="stream-list"></div>
+
+    <h3>Previous Events</h3>
+    <div id="past" class="stream-list"></div>
+  </div>
+
+  <!-- Shared data layer -->
+  <script src="./yt-shared.js"></script>
+
+  <script>
+    const TIMEZONE = "Europe/London";
+    function formatUKDate(iso) {
+      return new Date(iso).toLocaleString("en-GB", {
+        dateStyle:"medium", timeStyle:"short", timeZone: TIMEZONE
+      });
+    }
+
+    function card(v, dateIso) {
+      const id    = v.id;
+      const title = v.title;
+      const t     = v.thumbnails || {};
+      const thumb = (t.medium && t.medium.url)
+        || (t.high && t.high.url)
+        || (t.default && t.default.url)
+        || `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
+
+      const a = document.createElement("a");
+      a.className = "stream-card";
+      a.href = `https://www.youtube.com/watch?v=${id}`;
+      a.target = "_blank";
+      a.rel = "noopener";
+      a.innerHTML = `
+        <img src="${thumb}" alt="">
+        <div class="stream-card-content">
+          <div class="stream-card-title">${title}</div>
+          <div class="stream-card-date">${formatUKDate(dateIso)}</div>
+        </div>
+      `;
+      return a;
+    }
+
+    function renderLists(data) {
+      const upEl = document.getElementById("upcoming");
+      const psEl = document.getElementById("past");
+      upEl.innerHTML = ""; psEl.innerHTML = "";
+
+      if (!data.upcoming || !data.upcoming.length) {
+        upEl.innerHTML = `<div class="message">We regularly add new events. Please check back soon.</div>`;
+      } else {
+        data.upcoming.forEach(v => {
+          upEl.appendChild(card(v, v.scheduledStartTime));
+        });
+      }
+
+      if (!data.past || !data.past.length) {
+        psEl.innerHTML = `<div class="message">No previous events found.</div>`;
+      } else {
+        data.past.forEach(v => {
+          psEl.appendChild(card(v, v.actualStartTime || v.scheduledStartTime));
+        });
+      }
+    }
+
+    YTShared.getSharedData()
+      .then(renderLists)
+      .catch(() => {
+        document.getElementById("upcoming").innerHTML =
+          `<div class="message">Sorry — problem loading livestreams right now.</div>`;
+        document.getElementById("past").innerHTML =
+          `<div class="message">Sorry — problem loading livestreams right now.</div>`;
+      });
+  </script>
+</body>
+</html>
