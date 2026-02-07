@@ -4,9 +4,12 @@
 <meta charset="utf-8" />
 <title>Livestreams List</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<!-- PT Sans -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&display=swap" rel="stylesheet">
+
 <style>
   :root { color-scheme: light; }
   body { margin:0; background:#fff; font-family:'PT Sans', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; }
@@ -23,17 +26,29 @@
     border:1px solid #ddd; border-radius:4px; overflow:hidden;
     display:block; text-decoration:none; color:#000; background:#fafafa;
   }
-  .stream-card img { width:100%; display:block; }
+  .thumb { width:100%; display:block; }
   .stream-card-content { padding:.75rem; }
   .stream-card-title { font-weight:700; margin-bottom:.25rem; }
   .stream-card-date { font-size:.85rem; color:#555; }
+
+  /* Compact CTA row under upcoming cards */
+  .cta-row {
+    display:flex; align-items:center; gap:.75rem;
+    padding:.5rem .75rem .75rem; /* a bit tighter */
+  }
+  .cta-row a {
+    display:inline-block; font-size:.85rem; color:#005398; text-decoration:none;
+  }
+  .cta-row a:hover { text-decoration:underline; }
+  .cta-sep { color:#bbb; }
+
   .message { color:#555; padding:.5rem 0; }
 </style>
 </head>
 <body>
   <div class="wrap">
     <h3>Upcoming Events</h3>
-    <p><em>Choose an event and click “Notify me” to get a reminder when it goes live.</em></p>
+    <p><em>Choose an event and click "Notify me" to get a reminder when it goes live.</em></p>
     <div id="upcoming" class="stream-list"></div>
 
     <h3>Previous Events</h3>
@@ -46,13 +61,74 @@
 
   <script>
     const TIMEZONE = "Europe/London";
+
     function formatUKDate(iso) {
       return new Date(iso).toLocaleString("en-GB", {
         dateStyle:"medium", timeStyle:"short", timeZone: TIMEZONE
       });
     }
 
-    function card(v, dateIso) {
+    /* ---- Calendar helpers (Google + ICS) ---- */
+    function toIcsStamp(d) {
+      // UTC Zulu, strip milliseconds & separators per iCalendar
+      return new Date(d).toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+    }
+
+    function buildCalendarCta(container, title, startISO, videoId) {
+      const start = new Date(startISO);
+      const end   = new Date(start.getTime() + 60 * 60 * 1000);
+
+      // Google Calendar URL
+      const gURL =
+        "https://www.google.com/calendar/render?action=TEMPLATE" +
+        `&text=${encodeURIComponent(title)}` +
+        `&dates=${toIcsStamp(start)}/${toIcsStamp(end)}` +
+        `&details=${encodeURIComponent("Watch on YouTube")}` +
+        `&location=${encodeURIComponent("YouTube")}`;
+
+      // ICS (Outlook / Apple) – generate a Blob so download works cleanly
+      const ics =
+`BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+DTSTART:${toIcsStamp(start)}
+DTEND:${toIcsStamp(end)}
+SUMMARY:${title}
+URL:https://www.youtube.com/watch?v=${videoId}
+END:VEVENT
+END:VCALENDAR`;
+      const icsBlob = new Blob([ics], { type: "text/calendar" });
+      const icsURL  = URL.createObjectURL(icsBlob);
+
+      const row = document.createElement("div");
+      row.className = "cta-row";
+
+      const aGoogle = document.createElement("a");
+      aGoogle.href = gURL;
+      aGoogle.target = "_blank";
+      aGoogle.rel = "noopener";
+      aGoogle.textContent = "Add to Google Calendar";
+
+      const sep = document.createElement("span");
+      sep.className = "cta-sep";
+      sep.textContent = "•";
+
+      const aIcs = document.createElement("a");
+      aIcs.href = icsURL;
+      aIcs.download = "livestream.ics";
+      aIcs.textContent = "Download ICS";
+
+      row.appendChild(aGoogle);
+      row.appendChild(sep);
+      row.appendChild(aIcs);
+
+      container.appendChild(row);
+    }
+
+    /* ---- Card renderers ---- */
+
+    // Base card for either upcoming or past; pass addCalendar=true for upcoming
+    function card(v, dateIso, addCalendar=false) {
       const id    = v.id;
       const title = v.title;
       const t     = v.thumbnails || {};
@@ -61,21 +137,39 @@
         || (t.default && t.default.url)
         || `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 
-      const a = document.createElement("a");
-      a.className = "stream-card";
-      a.href = `https://www.youtube.com/watch?v=${id}`;
-      a.target = "_blank";
-      a.rel = "noopener";
-      a.innerHTML = `
-        <img src="${thumb}" alt="">
-        <div class="stream-card-content">
-          <div class="stream-card-title">${title}</div>
-          <div class="stream-card-date">${formatUKDate(dateIso)}</div>
-        </div>
+      // Card root (link wraps thumbnail only; content remains clickable text)
+      const card = document.createElement("div");
+      card.className = "stream-card";
+
+      const link = document.createElement("a");
+      link.href = `https://www.youtube.com/watch?v=${id}`;
+      link.target = "_blank";
+      link.rel = "noopener";
+
+      const img = document.createElement("img");
+      img.className = "thumb";
+      img.src = thumb;
+      img.alt = "";
+      link.appendChild(img);
+      card.appendChild(link);
+
+      const content = document.createElement("div");
+      content.className = "stream-card-content";
+      content.innerHTML = `
+        <div class="stream-card-title">${title}</div>
+        <div class="stream-card-date">${formatUKDate(dateIso)}</div>
       `;
-      return a;
+      card.appendChild(content);
+
+      if (addCalendar) {
+        // Compact calendar CTA sits under the content block
+        buildCalendarCta(card, title, dateIso, id);
+      }
+
+      return card;
     }
 
+    /* ---- Page rendering ---- */
     function renderLists(data) {
       const upEl = document.getElementById("upcoming");
       const psEl = document.getElementById("past");
@@ -85,7 +179,8 @@
         upEl.innerHTML = `<div class="message">We regularly add new events. Please check back soon.</div>`;
       } else {
         data.upcoming.forEach(v => {
-          upEl.appendChild(card(v, v.scheduledStartTime));
+          // Upcoming: show calendar CTA; date = scheduled start
+          upEl.appendChild(card(v, v.scheduledStartTime, true));
         });
       }
 
@@ -93,7 +188,8 @@
         psEl.innerHTML = `<div class="message">No previous events found.</div>`;
       } else {
         data.past.forEach(v => {
-          psEl.appendChild(card(v, v.actualStartTime || v.scheduledStartTime));
+          // Past: no calendar CTA; date = actual start (fallback scheduled)
+          psEl.appendChild(card(v, v.actualStartTime || v.scheduledStartTime, false));
         });
       }
     }
