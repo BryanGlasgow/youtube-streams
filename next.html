@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Next Livestream</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root { color-scheme: light; }
+  body { margin:0; background:#fff; font-family:'PT Sans', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; }
+  .container { max-width: 720px; margin: 0 auto; padding: 1rem; }
+  .stream { border:1px solid #ddd; border-radius:6px; overflow:hidden; background:#fff; }
+  .stream a { color: inherit; text-decoration: none; }
+  .stream img { width:100%; display:block; aspect-ratio:16/9; object-fit:cover; object-position:center; }
+  .content { padding: .75rem; }
+  .title { font-weight:700; margin-bottom:.25rem; }
+  .date { font-size:.9rem; color:#555; }
+  .countdown { margin-top:.25rem; font-size:.95rem; font-weight:700; color:#333; }
+  .countdown.live { color:#cc0000; }
+  .watch-live { margin-top:.75rem; }
+  .watch-live a { display:inline-block; background:#cc0000; color:#fff; padding:.5rem .75rem; border-radius:3px; font-weight:700; }
+  .watch-live a:hover { background:#a30000; }
+</style>
+</head>
+<body>
+  <div class="container">
+    <div id="nextEventOutput">Loading next livestream…</div>
+  </div>
+
+  <!-- Shared data layer -->
+  <script src="./yt-shared.js"></script>
+
+  <script>
+    const TIMEZONE = "Europe/London";
+
+    function formatUKDate(iso) {
+      return new Date(iso).toLocaleString("en-GB", {
+        dateStyle:"medium", timeStyle:"short", timeZone: TIMEZONE
+      });
+    }
+
+    function renderNext(event) {
+      const mount = document.getElementById("nextEventOutput");
+      if (!event) {
+        mount.innerHTML = "<p>No livestreams available.</p>";
+        return;
+      }
+
+      const id        = event.id;
+      const title     = event.title;
+      const startIso  = event.scheduledStartTime || event.actualStartTime;
+      const startTime = new Date(startIso);
+      const thumb     = `https://i.ytimg.com/vi/${id}/hq720.jpg`;
+
+      mount.innerHTML = `
+        <div class="stream">
+          <a href="https://www.youtube.com/watch?v=${id}" target="_blank" rel="noopener">
+            <img src="${thumb}" alt="">
+          </a>
+          <div class="content">
+            <div class="title">${title}</div>
+            <div class="date">${formatUKDate(startIso)} (UK time)</div>
+            <div class="countdown" id="countdown"></div>
+            <div class="watch-live" id="watchLive" style="display:none">
+              <a href="https://www.youtube.com/watch?v=${id}&live_chat=1" target="_blank" rel="noopener">▶ Watch live on YouTube</a>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const countdownEl = document.getElementById("countdown");
+      const watchLiveEl = document.getElementById("watchLive");
+
+      function updateCountdown() {
+        const now = new Date();
+        if (now >= startTime) {
+          countdownEl.textContent = "LIVE NOW";
+          countdownEl.classList.add("live");
+          watchLiveEl.style.display = "block";
+          return;
+        }
+        const diff = startTime - now;
+        const mins = Math.floor(diff/60000);
+        const hrs  = Math.floor(mins/60);
+        const days = Math.floor(hrs/24);
+
+        let text;
+        if (days > 0) text = `Starts in ${days} day${days!==1?"s":""}`;
+        else if (hrs > 0) text = `Starts in ${hrs} hour${hrs!==1?"s":""}`;
+        else text = `Starts in ${mins} minute${mins!==1?"s":""}`;
+
+        countdownEl.textContent = text;
+      }
+
+      updateCountdown();
+      setInterval(updateCountdown, 60_000);
+    }
+
+    YTShared.getSharedData()
+      .then(data => renderNext(data.next))
+      .catch(() => {
+        document.getElementById("nextEventOutput").innerHTML =
+          "<p>Sorry — problem loading livestreams.</p>";
+      });
+  </script>
+</body>
+</html>
