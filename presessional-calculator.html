@@ -26,7 +26,6 @@
 </head>
 <body>
 <div class="wrap">
-  
 
   <div class="card">
     <h2>1) Choose your target IELTS requirement</h2>
@@ -47,107 +46,213 @@
       <div><label for="S">Speaking</label><input id="S" type="number" step="0.5" min="0" max="9"></div>
     </div>
 
-   
-
     <button id="go">Check Start Date</button>
-
     <div id="result" class="result" style="display:none"></div>
 
-
+    <div class="foot">
+      <strong>Notes</strong>: Overall rounding follows IELTS (.25→next .5; .75→next whole). Course dates/fees are for in‑person entries only (online option intentionally omitted here).
+    </div>
   </div>
 </div>
 
 <script>
 /* -------------------------------------------------------
-   IELTS ROUNDING (updated): .25 → next .5, .75 → next .0
+   IELTS OVERALL ROUNDING (as requested)
+   .25 → next .5 ; .75 → next whole band
 ------------------------------------------------------- */
 function roundIeltsOverall(avg){
   const eps = 1e-9;
   const base = Math.floor(avg);
   const frac = avg - base;
-
   const near = (a,b)=>Math.abs(a-b)<0.001+eps;
-
   if(near(frac,0.25)) return base + 0.5;
   if(near(frac,0.75)) return base + 1.0;
-
   return Math.round(avg*2)/2;
 }
-
 function overallFrom(L,R,W,S){
   return roundIeltsOverall((L+R+W+S)/4);
 }
 
 /* -------------------------------------------------------
-   Utilities
+   Small utils
 ------------------------------------------------------- */
-const allAtLeast = (arr,n)=>arr.every(v=>v>=n);
-const noneBelow  = (arr,n)=>arr.every(v=>v>=n);
-const countEq     = (arr,n)=>arr.filter(v=>v===n).length;
-const countAtLeast=(arr,n)=>arr.filter(v=>v>=n).length;
+const allAtLeast   = (arr,n)=>arr.every(v=>v>=n);
+const noneBelow    = (arr,n)=>arr.every(v=>v>=n);
+const countEq      = (arr,n)=>arr.filter(v=>v===n).length;
+const countAtLeast = (arr,n)=>arr.filter(v=>v>=n).length;
 
 /* -------------------------------------------------------
-   FULL RULESETS (all 6 categories)
-   Sourced from:
-   - 6.0 overall          ([1](https://www.gla.ac.uk/international/englishlanguage/requirements/))
-   - 6.5 overall          ([1](https://www.gla.ac.uk/international/englishlanguage/requirements/))
-   - 6.5 overall (writing)([1](https://www.gla.ac.uk/international/englishlanguage/requirements/))
-   - 6.5 every skill      ([1](https://www.gla.ac.uk/international/englishlanguage/requirements/))
-   - 7.0 overall          ([2](https://www.gla.ac.uk/schools/mlc/eas/))
-   - 7.0 every skill      ([3](https://www.gla.ac.uk/))
+   COURSE INFO (2026 in-person) – source: Course Dates/Fees page
+------------------------------------------------------- */
+const COURSE_INFO = {
+  "January Entry":  { start:"9 Jan 2026",  end:"28 Aug 2026", deadline:"5 Dec 2025",  registration:"19 Dec 2025", fee:"£14,300" },
+  "February Entry": { start:"13 Feb 2026", end:"28 Aug 2026", deadline:"9 Jan 2026",  registration:"26 Jan 2026", fee:"£12,100" },
+  "April Entry":    { start:"27 Mar 2026", end:"28 Aug 2026", deadline:"13 Feb 2026", registration:"9 Mar 2026",  fee:"£9,900"  },
+  "May Entry":      { start:"1 May 2026",  end:"28 Aug 2026", deadline:"20 Mar 2026", registration:"13 Apr 2026", fee:"£7,700"  },
+  "June Entry":     { start:"15 Jun 2026", end:"28 Aug 2026", deadline:"1 May 2026",  registration:"25 May 2026", fee:"£5,500"  },
+  "July Entry":     { start:"27 Jul 2026", end:"28 Aug 2026", deadline:"12 Jun 2026", registration:"6 Jul 2026",  fee:"£2,750"  }
+};
+
+/* -------------------------------------------------------
+   RULESETS rebuilt from the official 2026 tables
+
+   SOURCES:
+   - 6.0 overall:                  /ifyouneedtoreachielts60overall/        (UofG EAS)
+   - 6.5 overall (+2 skills 6.5):  /ifyouneedtoreachielts65overall/        (UofG EAS)
+   - 6.5 overall (writing rules):  /ifyouneedtoreachielts65overallwriting65nosubtestlessthan60orwriting60allothersubtestsat65/ (UofG EAS)
+   - 6.5 in every skill:           /ifyouneedtoreachielts65ineveryskill/   (UofG EAS)
+   - 7.0 overall:                  /ifyouneedtoreachielts70overall/        (UofG EAS)
+   - 7.0 in every skill:           /ifyouneedtoreachielts70ineveryskill/   (UofG EAS)
+
+   Implementation notes:
+   - We order tests from JULY → JANUARY so users land on the *shortest* course
+     that satisfies the table (mirrors the site’s guidance).
+   - “No more than one skill at X” = countEq([L,R,W,S], X) <= 1.
+   - Where a branch mentions a specific Writing score, we apply that to W and,
+     where appropriate, interpret “at least one/two skill(s) at Y” on [L,R,S].
 ------------------------------------------------------- */
 const RULES = {
+  /* --------------------------- Target: IELTS 6.0 overall --------------------------- */
   "60-overall":[
-    { test:({L,R,W,S,O})=>O>=6&&W>=6&&noneBelow([L,R,W,S],5.5), result:"July Entry" },
+    // July: Overall 6.0, Writing 6.0, none below 5.5
+    { test:({L,R,W,S,O})=>O>=6.0 && W>=6.0 && noneBelow([L,R,W,S],5.5), result:"July Entry" },
+
+    // June: 5.5 or higher in all skills
     { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5.5), result:"June Entry" },
-    { test:({L,R,W,S,O})=>O>=5.5&&W>=5.5&&noneBelow([L,R,W,S],5.0), result:"May Entry" },
+
+    // May: Overall 5.5, Writing 5.5, none below 5.0
+    { test:({L,R,W,S,O})=>O>=5.5 && W>=5.5 && noneBelow([L,R,W,S],5.0), result:"May Entry" },
+
+    // April: 5.0 or higher in all skills
     { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5.0), result:"April Entry" },
-    { test:({L,R,W,S,O})=>O>=5&&W>=5&&noneBelow([L,R,W,S],4.5), result:"February Entry" },
+
+    // February: Overall 5.0, Writing 5.0, none below 4.5
+    { test:({L,R,W,S,O})=>O>=5.0 && W>=5.0 && noneBelow([L,R,W,S],4.5), result:"February Entry" },
+
+    // January: 4.5 in all skills or higher
     { test:({L,R,W,S})=>allAtLeast([L,R,W,S],4.5), result:"January Entry" }
   ],
 
+  /* ---- Target: IELTS 6.5 overall (also covers '6.5 with ≥2 skills at 6.5, none <6.0') ---- */
   "65-overall":[
-    { test:({L,R,W,S,O})=>O>=6.5&&W>=6&&noneBelow([L,R,W,S],5.5)&&countEq([L,R,W,S],5.5)<=1, result:"July Entry" },
-    { test:({L,R,W,S,O})=>O>=6&&((W>=6&&noneBelow([L,R,W,S],5.5))||(W===5.5&&countAtLeast([L,R,S],6)>=3)), result:"June Entry" },
-    { test:({L,R,W,S,O})=>O>=5.5&&W===5.5&&noneBelow([L,R,W,S],5)&&countEq([L,R,W,S],5)<=1, result:"May Entry" },
-    { test:({L,R,W,S,O})=>O>=5.5&&((W>=5.5&&noneBelow([L,R,W,S],5))||(W===5&&countAtLeast([L,R,S],5.5)>=3)), result:"April Entry" },
-    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5), result:"February Entry" },
-    { test:({L,R,W,S,O})=>O>=5&&W>=5&&noneBelow([L,R,W,S],4.5), result:"January Entry" }
+    // July: Overall 6.0 with no skill below 5.5
+    { test:({L,R,W,S,O})=>O>=6.0 && noneBelow([L,R,W,S],5.5), result:"July Entry" },
+
+    // June: Minimum 5.5 in all skills
+    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5.5), result:"June Entry" },
+
+    // May: Overall 5.5, W≥5.5, and no more than one skill at 5.0 (none below 5.0)
+    { test:({L,R,W,S,O})=>O>=5.5 && W>=5.5 && noneBelow([L,R,W,S],5.0) && countEq([L,R,W,S],5.0)<=1, result:"May Entry" },
+
+    // April: Overall 5.5 AND (W≥5.5 & none below 5.0  OR  W=5.0 & [L,R,S]≥5.5)
+    { test:({L,R,W,S,O})=>O>=5.5 && (
+        (W>=5.5 && noneBelow([L,R,W,S],5.0)) ||
+        (W===5.0 && allAtLeast([L,R,S],5.5))
+      ), result:"April Entry" },
+
+    // February: 5.0 or higher in all skills
+    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5.0), result:"February Entry" },
+
+    // January: Overall 5.0, Writing 5.0, none below 4.5
+    { test:({L,R,W,S,O})=>O>=5.0 && W>=5.0 && noneBelow([L,R,W,S],4.5), result:"January Entry" }
   ],
 
+  /* ------------- Target: IELTS 6.5 overall with writing condition (two branches) ------------- */
   "65-overall-writing-conds":[
-    { test:({L,R,W,S,O})=>O>=6.5&&((W>=6.5&&countEq([L,R,W,S],5.5)<=1&&noneBelow([L,R,W,S],5.5))||(W===6&&countAtLeast([L,R,S],6.5)>=2&&noneBelow([L,R,W,S],6))), result:"July Entry" },
-    { test:({L,R,W,S,O})=>O>=6&&((W>=6&&countEq([L,R,W,S],5.5)===1&&noneBelow([L,R,W,S],5.5))||(W===5.5&&countAtLeast([L,R,S],6.5)>=1&&noneBelow([L,R,W,S],6))), result:"June Entry" },
-    { test:({L,R,W,S,O})=>O>=5.5&&W>=5.5&&(noneBelow([L,R,W,S],5.5)||(countAtLeast([L,R,S],6)>=1&&countEq([L,R,W,S],5)<=1)), result:"May Entry" },
-    { test:({L,R,W,S,O})=>O>=5.5&&((W>=5.5&&countEq([L,R,W,S],5)<=1)||(W===5&&countAtLeast([L,R,S],6)>=1&&noneBelow([L,R,W,S],5.5))), result:"April Entry" },
-    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5), result:"February Entry" },
-    { test:({L,R,W,S,O})=>O>=5&&noneBelow([L,R,W,S],4.5)&&((W>=5&&countEq([L,R,W,S],4.5)<=1)||(W===4.5&&countAtLeast([L,R,S],5.5)>=1&&noneBelow([L,R,S],5))), result:"January Entry" }
+    // July: Overall 6.5 AND (W≥6.5 & ≤1 skill at 5.5  OR  W=6.0 & ≥2 of [L,R,S] at 6.5 & [L,R,S]≥6.0)
+    { test:({L,R,W,S,O})=>O>=6.5 && (
+        (W>=6.5 && countEq([L,R,W,S],5.5)<=1) ||
+        (W===6.0 && countAtLeast([L,R,S],6.5)>=2 && noneBelow([L,R,S],6.0))
+      ), result:"July Entry" },
+
+    // June: Overall 6.0 AND (W≥6.0 & only one skill at 5.5  OR  W=5.5 & ≥1 of [L,R,S] at 6.5 & [L,R,S]≥6.0)
+    { test:({L,R,W,S,O})=>O>=6.0 && (
+        (W>=6.0 && countEq([L,R,W,S],5.5)===1) ||
+        (W===5.5 && countAtLeast([L,R,S],6.5)>=1 && noneBelow([L,R,S],6.0))
+      ), result:"June Entry" },
+
+    // May: Overall 5.5, W≥5.5, and (no skill below 5.5  OR  ≥1 of [L,R,S] at 6.0 & ≤1 skill at 5.0)
+    { test:({L,R,W,S,O})=>O>=5.5 && W>=5.5 && (
+        noneBelow([L,R,W,S],5.5) ||
+        (countAtLeast([L,R,S],6.0)>=1 && countEq([L,R,W,S],5.0)<=1)
+      ), result:"May Entry" },
+
+    // April: Overall 5.5 AND (W≥5.5 & ≤1 skill at 5.0  OR  W=5.0 & ≥1 of [L,R,S] at 6.0 & [L,R,S]≥5.5)
+    { test:({L,R,W,S,O})=>O>=5.5 && (
+        (W>=5.5 && countEq([L,R,W,S],5.0)<=1) ||
+        (W===5.0 && countAtLeast([L,R,S],6.0)>=1 && noneBelow([L,R,S],5.5))
+      ), result:"April Entry" },
+
+    // February: 5.0 or higher in all skills
+    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5.0), result:"February Entry" },
+
+    // January: Overall ≥5.0, none below 4.5, and (W≥5.0 & ≤1 at 4.5  OR  W=4.5 & ≥1 of [L,R,S] at 5.5 & [L,R,S]≥5.0)
+    { test:({L,R,W,S,O})=>O>=5.0 && noneBelow([L,R,W,S],4.5) && (
+        (W>=5.0 && countEq([L,R,W,S],4.5)<=1) ||
+        (W===4.5 && countAtLeast([L,R,S],5.5)>=1 && noneBelow([L,R,S],5.0))
+      ), result:"January Entry" }
   ],
 
+  /* --------------------------- Target: IELTS 6.5 in every skill --------------------------- */
   "65-every":[
-    { test:({L,R,W,S,O})=>O>=6.5&&W>=6.5&&countEq([L,R,W,S],6)<=1&&noneBelow([L,R,W,S],6), result:"July Entry" },
-    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],6), result:"June Entry" },
-    { test:({L,R,W,S,O})=>O>=6&&W>=6&&noneBelow([L,R,W,S],5.5), result:"May Entry" },
+    // July: Overall 6.5, W≥6.5, and ≤1 skill at 6.0
+    { test:({L,R,W,S,O})=>O>=6.5 && W>=6.5 && countEq([L,R,W,S],6.0)<=1, result:"July Entry" },
+
+    // June: 6.0 in all skills
+    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],6.0), result:"June Entry" },
+
+    // May: Overall 6.0, W≥6.0, none below 5.5
+    { test:({L,R,W,S,O})=>O>=6.0 && W>=6.0 && noneBelow([L,R,W,S],5.5), result:"May Entry" },
+
+    // April: 5.5 in all skills
     { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5.5), result:"April Entry" },
-    { test:({L,R,W,S,O})=>O>=5.5&&W>=5.5&&noneBelow([L,R,W,S],5), result:"February Entry" },
-    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5), result:"January Entry" }
+
+    // February: Overall 5.5, W≥5.5, none below 5.0
+    { test:({L,R,W,S,O})=>O>=5.5 && W>=5.5 && noneBelow([L,R,W,S],5.0), result:"February Entry" },
+
+    // January: 5.0 in all skills
+    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5.0), result:"January Entry" }
   ],
 
+  /* --------------------------- Target: IELTS 7.0 overall --------------------------- */
   "70-overall":[
+    // July: 6.5 to 7.0 in all skills (i.e., all ≥6.5)
     { test:({L,R,W,S})=>allAtLeast([L,R,W,S],6.5), result:"July Entry" },
-    { test:({L,R,W,S,O})=>O>=6.5&&W>=6.5&&noneBelow([L,R,W,S],6), result:"June Entry" },
-    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],6), result:"May Entry" },
-    { test:({L,R,W,S,O})=>O>=6&&W>=6&&noneBelow([L,R,W,S],5.5), result:"April Entry" },
+
+    // June: Overall 6.5, W≥6.5, none below 6.0
+    { test:({L,R,W,S,O})=>O>=6.5 && W>=6.5 && noneBelow([L,R,W,S],6.0), result:"June Entry" },
+
+    // May: 6.0 in all skills
+    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],6.0), result:"May Entry" },
+
+    // April: Overall 6.0, W≥6.0, none below 5.5
+    { test:({L,R,W,S,O})=>O>=6.0 && W>=6.0 && noneBelow([L,R,W,S],5.5), result:"April Entry" },
+
+    // February: 5.5 in all skills
     { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5.5), result:"February Entry" },
-    { test:({L,R,W,S,O})=>O>=5.5&&W>=5.5&&noneBelow([L,R,W,S],5), result:"January Entry" }
+
+    // January: Overall 5.5, W≥5.5, none below 5.0
+    { test:({L,R,W,S,O})=>O>=5.5 && W>=5.5 && noneBelow([L,R,W,S],5.0), result:"January Entry" }
   ],
 
+  /* --------------------------- Target: IELTS 7.0 in every skill --------------------------- */
   "70-every":[
-    { test:({L,R,W,S,O})=>O>=7&&W>=7&&noneBelow([L,R,W,S],6.5), result:"July Entry" },
+    // July: Overall 7.0, W≥7.0, none below 6.5
+    { test:({L,R,W,S,O})=>O>=7.0 && W>=7.0 && noneBelow([L,R,W,S],6.5), result:"July Entry" },
+
+    // June: 6.5 in all skills
     { test:({L,R,W,S})=>allAtLeast([L,R,W,S],6.5), result:"June Entry" },
-    { test:({L,R,W,S,O})=>O>=6.5&&W>=6.5&&noneBelow([L,R,W,S],6), result:"May Entry" },
-    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],6), result:"April Entry" },
-    { test:({L,R,W,S,O})=>O>=6&&W>=6&&noneBelow([L,R,W,S],5.5), result:"February Entry" },
+
+    // May: Overall 6.5, W≥6.5, none below 6.0
+    { test:({L,R,W,S,O})=>O>=6.5 && W>=6.5 && noneBelow([L,R,W,S],6.0), result:"May Entry" },
+
+    // April: 6.0 in all skills
+    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],6.0), result:"April Entry" },
+
+    // February: Overall 6.0, W≥6.0, none below 5.5
+    { test:({L,R,W,S,O})=>O>=6.0 && W>=6.0 && noneBelow([L,R,W,S],5.5), result:"February Entry" },
+
+    // January: 5.5 in all skills
     { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5.5), result:"January Entry" }
   ]
 };
@@ -169,8 +274,14 @@ $("go").addEventListener("click",()=>{
     return;
   }
 
-  const O = overallFrom(L,R,W,S);
+  // Basic sanity on range 0–9
+  if([L,R,W,S].some(v=>v<0 || v>9)){
+    $("result").style.display="block";
+    $("result").innerHTML="Each IELTS subscore must be between 0.0 and 9.0.";
+    return;
+  }
 
+  const O = overallFrom(L,R,W,S);
   const scores={L,R,W,S,O};
   const rules = RULES[$("target").value];
   const match = rules.find(r=>r.test(scores));
@@ -178,11 +289,22 @@ $("go").addEventListener("click",()=>{
   $("result").style.display="block";
 
   if(match){
-    $("result").innerHTML=`<strong>${match.result}</strong><br>
-      <span class="muted">Computed overall: <code class="small">${O.toFixed(1)}</code></span>`;
+    const info = COURSE_INFO[match.result];
+    $("result").innerHTML = `
+      <strong>${match.result}</strong><br>
+      <div class="muted">Computed overall: <code class="small">${O.toFixed(1)}</code></div>
+      <br>
+      <strong>Start date:</strong> ${info.start}<br>
+      <strong>End date:</strong> ${info.end}<br>
+      <strong>Application deadline:</strong> ${info.deadline}<br>
+      <strong>Registration opens:</strong> ${info.registration}<br>
+      <strong>Fees:</strong> ${info.fee}
+    `;
   } else {
-    $("result").innerHTML=`No exact match in official tables.<br>
-      <span class="muted">Overall: ${O.toFixed(1)} — please contact EAS for guidance.</span>`;
+    $("result").innerHTML = `
+      No exact match in official tables.<br>
+      <span class="muted">Overall: ${O.toFixed(1)} — please contact EAS for guidance.</span>
+    `;
   }
 });
 </script>
