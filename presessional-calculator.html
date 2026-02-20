@@ -45,10 +45,10 @@
 
     <h2 style="margin-top:18px;">2) Enter your current IELTS scores</h2>
     <div class="grid">
-      <div><label for="L">Listening</label><input id="L" type="number" step="0.5" min="0" max="9" inputmode="decimal" ></div>
-      <div><label for="R">Reading</label><input id="R" type="number" step="0.5" min="0" max="9" inputmode="decimal" ></div>
-      <div><label for="W">Writing</label><input id="W" type="number" step="0.5" min="0" max="9" inputmode="decimal" ></div>
-      <div><label for="S">Speaking</label><input id="S" type="number" step="0.5" min="0" max="9" inputmode="decimal" ></div>
+      <div><label for="L">Listening</label><input id="L" type="number" step="0.5" min="0" max="9" inputmode="decimal"></div>
+      <div><label for="R">Reading</label><input id="R" type="number" step="0.5" min="0" max="9" inputmode="decimal"></div>
+      <div><label for="W">Writing</label><input id="W" type="number" step="0.5" min="0" max="9" inputmode="decimal"></div>
+      <div><label for="S">Speaking</label><input id="S" type="number" step="0.5" min="0" max="9" inputmode="decimal"></div>
     </div>
 
     <button id="go">Check Start Date</button>
@@ -59,8 +59,7 @@
 
 <script>
 /* -------------------------------------------------------
-   IELTS overall rounding:
-   .25 → next .5 ; .75 → next whole band
+   IELTS overall rounding (.25 → next .5 ; .75 → next whole)
 ------------------------------------------------------- */
 function roundIeltsOverall(avg){
   const eps = 1e-9;
@@ -76,7 +75,7 @@ function overallFrom(L,R,W,S){
 }
 
 /* -------------------------------------------------------
-   Small helpers
+   Helpers
 ------------------------------------------------------- */
 const allAtLeast   = (arr,n)=>arr.every(v=>v>=n);
 const noneBelow    = (arr,n)=>arr.every(v=>v>=n);
@@ -84,7 +83,8 @@ const countEq      = (arr,n)=>arr.filter(v=>v===n).length;
 const countAtLeast = (arr,n)=>arr.filter(v=>v>=n).length;
 
 /* -------------------------------------------------------
-   COURSE INFO (2026 in-person) – UofG official dates/fees
+   COURSE INFO (2026 in-person) – official UofG dates/fees
+   Source: Course Dates, Application Deadlines & Fees page. (2026 table) 
 ------------------------------------------------------- */
 const COURSE_INFO = {
   "January Entry":  { start:"9 Jan 2026",  end:"28 Aug 2026", deadline:"5 Dec 2025",  registration:"19 Dec 2025", fee:"£14,300" },
@@ -96,8 +96,21 @@ const COURSE_INFO = {
 };
 
 /* -------------------------------------------------------
-   RULESETS rebuilt from UofG “When should I start?” tables
-   (8 selectable targets; some reuse the same rules)
+   DISPLAY LABELS (Module/Block prefixes requested)
+------------------------------------------------------- */
+const DISPLAY_LABEL = {
+  "January Entry":  "Module/Block 1 – January Entry",
+  "February Entry": "Module/Block 2 – February Entry",
+  "April Entry":    "Module/Block 3 – April Entry",
+  "May Entry":      "Module/Block 4 – May Entry",
+  "June Entry":     "Module/Block 5 – June Entry",
+  "July Entry":     "Module/Block 6 – July Entry"
+};
+
+/* -------------------------------------------------------
+   RULESETS rebuilt from UofG “When should I start?” tables:
+   6.0 overall, 6.5 overall, 6.5 writing variants, 6.5 in every skill,
+   7.0 overall, 7.0 in every skill. [1](https://www.gla.ac.uk/schools/mlc/eas/pre-sessionalcourses/ifyouneedtoreachielts65overallwriting65nosubtestlessthan60orwriting60allothersubtestsat65/)[2](https://www.gla.ac.uk/schools/mlc/eas/pre-sessionalcourses/ifyouneedtoreachielts60overall/)[3](https://www.glazgodiscoverycentre.co.uk/schools/mlc/eas/pre-sessionalcourses/online-block-a/)[4](https://www.gla.ac.uk/postgraduate/taught/translation-intercultural-communication/englangers/)[5](https://www.gla.ac.uk/schools/mlc/eas/pre-sessionalenglishcourses/ifyouneedtoreachielts65overall/)
 ------------------------------------------------------- */
 const RULES = {
 
@@ -129,7 +142,7 @@ const RULES = {
     { test:({L,R,W,S,O})=>O>=5.0 && W>=5.0 && noneBelow([L,R,W,S],4.5), result:"January Entry" }
   ],
 
-  /* ====== IELTS 6.5 overall (writing condition) – used for:
+  /* ====== IELTS 6.5 overall (writing conditions) – used for:
      (A) writing at 6.5, no subtest <6.0
      (B) writing at 6.0, all other subtests at 6.5 ====== */
   "65-writing-conds-65": "USE-65-WRITING",
@@ -226,9 +239,11 @@ $("go").addEventListener("click",()=>{
   const match = rules.find(r=>r.test(scores));
 
   if(match){
-    const info = COURSE_INFO[match.result];
+    const entryName = match.result; // e.g., "January Entry"
+    const label = DISPLAY_LABEL[entryName] || entryName;
+    const info = COURSE_INFO[entryName];
     out.innerHTML = `
-      <strong>${match.result}</strong><br>
+      <strong>${label}</strong><br>
       <strong>Start date:</strong> ${info.start}<br>
       <strong>End date:</strong> ${info.end}<br>
       <strong>Application deadline:</strong> ${info.deadline}<br>
