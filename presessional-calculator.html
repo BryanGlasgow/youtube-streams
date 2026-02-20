@@ -18,7 +18,6 @@
   button{background:var(--uofg);color:#fff;border:none;border-radius:10px;padding:12px 18px;font-size:1rem;font-weight:700;cursor:pointer;margin-top:18px}
   button:hover{background:#024b66}
   .result{margin-top:20px;padding:16px;border-left:4px solid var(--uofg);background:#f8fafc;border-radius:8px}
-  .muted{color:var(--muted);font-size:.9rem}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 </style>
 </head>
@@ -40,7 +39,7 @@
       <option value="65-every">IELTS 6.5 in all skills</option>
 
       <option value="70-overall">IELTS 7.0 overall</option>
-      <option value="70-every">IELTS 7.0 in all skills</option>
+      <option value="70-every">IELTS 7.0 in every skill</option>
     </select>
 
     <h2 style="margin-top:18px;">2) Enter your current IELTS scores</h2>
@@ -58,6 +57,13 @@
 </div>
 
 <script>
+/* -------------------------------------------------------
+   SOURCES (for maintainers; not shown to users)
+   - Course dates/fees table (2026): UofG EAS Course Dates page. 
+   - Baseline “When can I start?” rules: target pages for 6.0/6.5/7.0 variants. [1](https://www.gla.ac.uk/schools/mlc/eas/pre-sessionalenglishcourses/ifyouneedtoreachielts65overall/)[2](https://www.glazgodiscoverycentre.co.uk/schools/mlc/eas/pre-sessionalcourses/coursedatesapplicationdeadlinesandfees/)[3](https://www.gla.ac.uk/schools/mlc/eas/pre-sessionalcourses/ifyouneedtoreachielts60overall/)[4](https://www.gla.ac.uk/schools/mlc/eas/pre-sessionalenglishcourses/pre-sessionalcoursecontent/)[5](https://www.gla.ac.uk/postgraduate/taught/businessadministration/englangers/)
+   - UPDATED (June/July only) for 6 targets per your spreadsheet. [6](https://gla-my.sharepoint.com/personal/bryan_martin_glasgow_ac_uk/_layouts/15/Doc.aspx?sourcedoc=%7B5EF6136F-6E34-49EF-9081-670DAD9749DD%7D&file=updatesToEntryRequirements.xlsx&action=default&mobileredirect=true)
+------------------------------------------------------- */
+
 /* -------------------------------------------------------
    IELTS overall rounding (.25 → next .5 ; .75 → next whole)
 ------------------------------------------------------- */
@@ -84,7 +90,7 @@ const countAtLeast = (arr,n)=>arr.filter(v=>v>=n).length;
 
 /* -------------------------------------------------------
    COURSE INFO (2026 in-person) – official UofG dates/fees
-   Source: Course Dates, Application Deadlines & Fees page. (2026 table) 
+   (Shown to applicants; data from 2026 table) 
 ------------------------------------------------------- */
 const COURSE_INFO = {
   "January Entry":  { start:"9 Jan 2026",  end:"28 Aug 2026", deadline:"5 Dec 2025",  registration:"19 Dec 2025", fee:"£14,300" },
@@ -96,7 +102,7 @@ const COURSE_INFO = {
 };
 
 /* -------------------------------------------------------
-   DISPLAY LABELS (Module/Block prefixes requested)
+   DISPLAY LABELS (Module/Block + Month)
 ------------------------------------------------------- */
 const DISPLAY_LABEL = {
   "January Entry":  "Module/Block 1 – January Entry",
@@ -108,99 +114,156 @@ const DISPLAY_LABEL = {
 };
 
 /* -------------------------------------------------------
-   RULESETS rebuilt from UofG “When should I start?” tables:
-   6.0 overall, 6.5 overall, 6.5 writing variants, 6.5 in every skill,
-   7.0 overall, 7.0 in every skill. [1](https://www.gla.ac.uk/schools/mlc/eas/pre-sessionalcourses/ifyouneedtoreachielts65overallwriting65nosubtestlessthan60orwriting60allothersubtestsat65/)[2](https://www.gla.ac.uk/schools/mlc/eas/pre-sessionalcourses/ifyouneedtoreachielts60overall/)[3](https://www.glazgodiscoverycentre.co.uk/schools/mlc/eas/pre-sessionalcourses/online-block-a/)[4](https://www.gla.ac.uk/postgraduate/taught/translation-intercultural-communication/englangers/)[5](https://www.gla.ac.uk/schools/mlc/eas/pre-sessionalenglishcourses/ifyouneedtoreachielts65overall/)
+   RULESETS
+   IMPORTANT:
+   - Only JUNE and JULY conditions are updated for the 6 targets
+     you mapped from the spreadsheet. All other months unchanged. [6](https://gla-my.sharepoint.com/personal/bryan_martin_glasgow_ac_uk/_layouts/15/Doc.aspx?sourcedoc=%7B5EF6136F-6E34-49EF-9081-670DAD9749DD%7D&file=updatesToEntryRequirements.xlsx&action=default&mobileredirect=true)
+   - Two targets (IELTS 6.0 overall, IELTS 6.5 overall (2×6.5)) are unchanged entirely.
+------------------------------------------------------- */
+
+/* ===== Unchanged target: IELTS 6.0 overall ===== */
+const RULES_60_OVERALL = [
+  { test:({L,R,W,S,O})=>O>=6 && W>=6 && noneBelow([L,R,W,S],5.5), result:"July Entry" },
+  { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5.5), result:"June Entry" },
+  { test:({L,R,W,S,O})=>O>=5.5 && W>=5.5 && noneBelow([L,R,W,S],5.0), result:"May Entry" },
+  { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5.0), result:"April Entry" },
+  { test:({L,R,W,S,O})=>O>=5.0 && W>=5.0 && noneBelow([L,R,W,S],4.5), result:"February Entry" },
+  { test:({L,R,W,S})=>allAtLeast([L,R,W,S],4.5), result:"January Entry" }
+];
+
+/* ===== IELTS 6.5 overall (no subtest below 6.0) — JUNE/JULY updated per spreadsheet ===== */
+const RULES_65_OVERALL_NOMIN = [
+  // JULY: Overall ≥6.0 & no subtest <5.5
+  { test:({L,R,W,S,O})=>O>=6.0 && noneBelow([L,R,W,S],5.5), result:"July Entry" },
+  // JUNE: Overall ≥5.5 & no subtest <5.5
+  { test:({L,R,W,S,O})=>O>=5.5 && noneBelow([L,R,W,S],5.5), result:"June Entry" },
+
+  // Remaining months unchanged (baseline) [2](https://www.glazgodiscoverycentre.co.uk/schools/mlc/eas/pre-sessionalcourses/coursedatesapplicationdeadlinesandfees/)
+  { test:({L,R,W,S,O})=>O>=5.5 && W>=5.5 && noneBelow([L,R,W,S],5.0) && countEq([L,R,W,S],5.0)<=1, result:"May Entry" },
+  { test:({L,R,W,S,O})=>O>=5.5 && (
+      (W>=5.5 && noneBelow([L,R,W,S],5.0)) ||
+      (W===5.0 && allAtLeast([L,R,S],5.5))
+    ), result:"April Entry" },
+  { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5.0), result:"February Entry" },
+  { test:({L,R,W,S,O})=>O>=5.0 && W>=5.0 && noneBelow([L,R,W,S],4.5), result:"January Entry" }
+];
+
+/* ===== IELTS 6.5 overall (6.5 in 2 subtests, no subtest <6.0) — UNCHANGED (separate copy) ===== */
+const RULES_65_OVERALL_2X65 = [
+  // JULY (baseline): Overall ≥6.0 & no subtest <5.5
+  { test:({L,R,W,S,O})=>O>=6.0 && noneBelow([L,R,W,S],5.5), result:"July Entry" },
+  // JUNE (baseline): minimum 5.5 in all skills
+  { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5.5), result:"June Entry" },
+
+  // Remaining months unchanged (baseline) [2](https://www.glazgodiscoverycentre.co.uk/schools/mlc/eas/pre-sessionalcourses/coursedatesapplicationdeadlinesandfees/)
+  { test:({L,R,W,S,O})=>O>=5.5 && W>=5.5 && noneBelow([L,R,W,S],5.0) && countEq([L,R,W,S],5.0)<=1, result:"May Entry" },
+  { test:({L,R,W,S,O})=>O>=5.5 && (
+      (W>=5.5 && noneBelow([L,R,W,S],5.0)) ||
+      (W===5.0 && allAtLeast([L,R,S],5.5))
+    ), result:"April Entry" },
+  { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5.0), result:"February Entry" },
+  { test:({L,R,W,S,O})=>O>=5.0 && W>=5.0 && noneBelow([L,R,W,S],4.5), result:"January Entry" }
+];
+
+/* ===== IELTS 6.5 overall (writing variants) — JUNE/JULY updated per spreadsheet ===== */
+const RULES_65_WRITING_UPDATED = [
+  // JULY: (Overall ≥6.0 & W≥6.0 & none <5.5) OR (W=5.5 & L,R,S all ≥6.0)
+  { test:({L,R,W,S,O})=>
+      (O>=6.0 && W>=6.0 && noneBelow([L,R,W,S],5.5)) ||
+      (W===5.5 && countAtLeast([L,R,S],6.0)===3),
+    result:"July Entry" },
+
+  // JUNE: (Overall ≥5.5 & W≥6.0 & none <5.5) OR (W=5.5 & L,R,S all ≥6.0)
+  { test:({L,R,W,S,O})=>
+      (O>=5.5 && W>=6.0 && noneBelow([L,R,W,S],5.5)) ||
+      (W===5.5 && countAtLeast([L,R,S],6.0)===3),
+    result:"June Entry" },
+
+  // Remaining months unchanged (baseline) [3](https://www.gla.ac.uk/schools/mlc/eas/pre-sessionalcourses/ifyouneedtoreachielts60overall/)
+  { test:({L,R,W,S,O})=>O>=5.5 && W>=5.5 && (
+      noneBelow([L,R,W,S],5.5) ||
+      (countAtLeast([L,R,S],6)>=1 && countEq([L,R,W,S],5.0)<=1)
+    ), result:"May Entry" },
+  { test:({L,R,W,S,O})=>O>=5.5 && (
+      (W>=5.5 && countEq([L,R,W,S],5.0)<=1) ||
+      (W===5.0 && countAtLeast([L,R,S],6)>=1 && noneBelow([L,R,S],5.5))
+    ), result:"April Entry" },
+  { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5.0), result:"February Entry" },
+  { test:({L,R,W,S,O})=>O>=5.0 && noneBelow([L,R,W,S],4.5) && (
+      (W>=5.0 && countEq([L,R,W,S],4.5)<=1) ||
+      (W===4.5 && countAtLeast([L,R,S],5.5)>=1 && noneBelow([L,R,S],5.0))
+    ), result:"January Entry" }
+];
+
+/* ===== IELTS 6.5 in every skill — JUNE/JULY updated per spreadsheet ===== */
+const RULES_65_EVERY = [
+  // JULY: Overall ≥6.0 & no subtest <6.0
+  { test:({L,R,W,S,O})=>O>=6.0 && noneBelow([L,R,W,S],6.0), result:"July Entry" },
+
+  // JUNE: Overall ≥5.5 & no subtest <6.0
+  { test:({L,R,W,S,O})=>O>=5.5 && noneBelow([L,R,W,S],6.0), result:"June Entry" },
+
+  // Remaining months unchanged (baseline) 
+  { test:({L,R,W,S,O})=>O>=6.0 && W>=6.0 && noneBelow([L,R,W,S],5.5), result:"May Entry" },
+  { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5.5), result:"April Entry" },
+  { test:({L,R,W,S,O})=>O>=5.5 && W>=5.5 && noneBelow([L,R,W,S],5.0), result:"February Entry" },
+  { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5.0), result:"January Entry" }
+];
+
+/* ===== IELTS 7.0 overall — JUNE/JULY updated per spreadsheet ===== */
+const RULES_70_OVERALL = [
+  // JULY: Overall ≥6.5 & no subtest <6.0
+  { test:({L,R,W,S,O})=>O>=6.5 && noneBelow([L,R,W,S],6.0), result:"July Entry" },
+
+  // JUNE: no subtest <6.0 (i.e., all ≥6.0)
+  { test:({L,R,W,S})=>allAtLeast([L,R,W,S],6.0), result:"June Entry" },
+
+  // Remaining months unchanged (baseline) [4](https://www.gla.ac.uk/schools/mlc/eas/pre-sessionalenglishcourses/pre-sessionalcoursecontent/)
+  { test:({L,R,W,S})=>allAtLeast([L,R,W,S],6.0), result:"May Entry" },
+  { test:({L,R,W,S,O})=>O>=6.0 && W>=6.0 && noneBelow([L,R,W,S],5.5), result:"April Entry" },
+  { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5.5), result:"February Entry" },
+  { test:({L,R,W,S,O})=>O>=5.5 && W>=5.5 && noneBelow([L,R,W,S],5.0), result:"January Entry" }
+];
+
+/* ===== IELTS 7.0 in every skill — JUNE/JULY updated per spreadsheet ===== */
+const RULES_70_EVERY = [
+  // JULY: Overall ≥6.5 & no subtest <6.5
+  { test:({L,R,W,S,O})=>O>=6.5 && noneBelow([L,R,W,S],6.5), result:"July Entry" },
+
+  // JUNE: all ≥6.5
+  { test:({L,R,W,S})=>allAtLeast([L,R,W,S],6.5), result:"June Entry" },
+
+  // Remaining months unchanged (baseline) [5](https://www.gla.ac.uk/postgraduate/taught/businessadministration/englangers/)
+  { test:({L,R,W,S,O})=>O>=6.5 && W>=6.5 && noneBelow([L,R,W,S],6.0), result:"May Entry" },
+  { test:({L,R,W,S})=>allAtLeast([L,R,W,S],6.0), result:"April Entry" },
+  { test:({L,R,W,S,O})=>O>=6.0 && W>=6.0 && noneBelow([L,R,W,S],5.5), result:"February Entry" },
+  { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5.5), result:"January Entry" }
+];
+
+/* -------------------------------------------------------
+   RULES registry keyed by dropdown values
 ------------------------------------------------------- */
 const RULES = {
+  "60-overall": RULES_60_OVERALL,
 
-  /* ====== IELTS 6.0 overall ====== */
-  "60-overall": [
-    { test:({L,R,W,S,O})=>O>=6 && W>=6 && noneBelow([L,R,W,S],5.5), result:"July Entry" },
-    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5.5), result:"June Entry" },
-    { test:({L,R,W,S,O})=>O>=5.5 && W>=5.5 && noneBelow([L,R,W,S],5.0), result:"May Entry" },
-    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5.0), result:"April Entry" },
-    { test:({L,R,W,S,O})=>O>=5.0 && W>=5.0 && noneBelow([L,R,W,S],4.5), result:"February Entry" },
-    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],4.5), result:"January Entry" }
-  ],
+  // 6.5 overall (no subtest <6.0) – updated June/July
+  "65-overall-nomin": RULES_65_OVERALL_NOMIN,
 
-  /* ====== IELTS 6.5 overall – used for:
-     (A) 6.5 overall, no subtest below 6.0
-     (B) 6.5 overall, 6.5 in 2 subtests, no subtest below 6.0 ====== */
-  "65-overall-nomin": "USE-65-OVERALL",
-  "65-overall-2x65":  "USE-65-OVERALL",
+  // 6.5 overall (2×6.5) – unchanged
+  "65-overall-2x65":  RULES_65_OVERALL_2X65,
 
-  "USE-65-OVERALL": [
-    { test:({L,R,W,S,O})=>O>=6 && noneBelow([L,R,W,S],5.5), result:"July Entry" },
-    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5.5), result:"June Entry" },
-    { test:({L,R,W,S,O})=>O>=5.5 && W>=5.5 && noneBelow([L,R,W,S],5.0) && countEq([L,R,W,S],5.0)<=1, result:"May Entry" },
-    { test:({L,R,W,S,O})=>O>=5.5 && (
-        (W>=5.5 && noneBelow([L,R,W,S],5.0)) ||
-        (W===5.0 && allAtLeast([L,R,S],5.5))
-      ), result:"April Entry" },
-    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5.0), result:"February Entry" },
-    { test:({L,R,W,S,O})=>O>=5.0 && W>=5.0 && noneBelow([L,R,W,S],4.5), result:"January Entry" }
-  ],
+  // 6.5 overall (writing rule) – both writing options share updated June/July
+  "65-writing-conds-65": RULES_65_WRITING_UPDATED,
+  "65-writing-conds-60": RULES_65_WRITING_UPDATED,
 
-  /* ====== IELTS 6.5 overall (writing conditions) – used for:
-     (A) writing at 6.5, no subtest <6.0
-     (B) writing at 6.0, all other subtests at 6.5 ====== */
-  "65-writing-conds-65": "USE-65-WRITING",
-  "65-writing-conds-60": "USE-65-WRITING",
+  // 6.5 in every skill – updated June/July
+  "65-every": RULES_65_EVERY,
 
-  "USE-65-WRITING": [
-    { test:({L,R,W,S,O})=>O>=6.5 && (
-        (W>=6.5 && countEq([L,R,W,S],5.5)<=1) ||
-        (W===6.0 && countAtLeast([L,R,S],6.5)>=2 && noneBelow([L,R,S],6))
-      ), result:"July Entry" },
-    { test:({L,R,W,S,O})=>O>=6.0 && (
-        (W>=6.0 && countEq([L,R,W,S],5.5)===1) ||
-        (W===5.5 && countAtLeast([L,R,S],6.5)>=1 && noneBelow([L,R,S],6))
-      ), result:"June Entry" },
-    { test:({L,R,W,S,O})=>O>=5.5 && W>=5.5 && (
-        noneBelow([L,R,W,S],5.5) ||
-        (countAtLeast([L,R,S],6)>=1 && countEq([L,R,W,S],5.0)<=1)
-      ), result:"May Entry" },
-    { test:({L,R,W,S,O})=>O>=5.5 && (
-        (W>=5.5 && countEq([L,R,W,S],5.0)<=1) ||
-        (W===5.0 && countAtLeast([L,R,S],6)>=1 && noneBelow([L,R,S],5.5))
-      ), result:"April Entry" },
-    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5.0), result:"February Entry" },
-    { test:({L,R,W,S,O})=>O>=5.0 && noneBelow([L,R,W,S],4.5) && (
-        (W>=5.0 && countEq([L,R,W,S],4.5)<=1) ||
-        (W===4.5 && countAtLeast([L,R,S],5.5)>=1 && noneBelow([L,R,S],5.0))
-      ), result:"January Entry" }
-  ],
+  // 7.0 overall – updated June/July
+  "70-overall": RULES_70_OVERALL,
 
-  /* ====== IELTS 6.5 in every skill ====== */
-  "65-every": [
-    { test:({L,R,W,S,O})=>O>=6.5 && W>=6.5 && countEq([L,R,W,S],6.0)<=1, result:"July Entry" },
-    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],6.0), result:"June Entry" },
-    { test:({L,R,W,S,O})=>O>=6.0 && W>=6.0 && noneBelow([L,R,W,S],5.5), result:"May Entry" },
-    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5.5), result:"April Entry" },
-    { test:({L,R,W,S,O})=>O>=5.5 && W>=5.5 && noneBelow([L,R,W,S],5.0), result:"February Entry" },
-    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5.0), result:"January Entry" }
-  ],
-
-  /* ====== IELTS 7.0 overall ====== */
-  "70-overall": [
-    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],6.5), result:"July Entry" },
-    { test:({L,R,W,S,O})=>O>=6.5 && W>=6.5 && noneBelow([L,R,W,S],6.0), result:"June Entry" },
-    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],6.0), result:"May Entry" },
-    { test:({L,R,W,S,O})=>O>=6.0 && W>=6.0 && noneBelow([L,R,W,S],5.5), result:"April Entry" },
-    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5.5), result:"February Entry" },
-    { test:({L,R,W,S,O})=>O>=5.5 && W>=5.5 && noneBelow([L,R,W,S],5.0), result:"January Entry" }
-  ],
-
-  /* ====== IELTS 7.0 in every skill ====== */
-  "70-every": [
-    { test:({L,R,W,S,O})=>O>=7.0 && W>=7.0 && noneBelow([L,R,W,S],6.5), result:"July Entry" },
-    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],6.5), result:"June Entry" },
-    { test:({L,R,W,S,O})=>O>=6.5 && W>=6.5 && noneBelow([L,R,W,S],6.0), result:"May Entry" },
-    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],6.0), result:"April Entry" },
-    { test:({L,R,W,S,O})=>O>=6.0 && W>=6.0 && noneBelow([L,R,W,S],5.5), result:"February Entry" },
-    { test:({L,R,W,S})=>allAtLeast([L,R,W,S],5.5), result:"January Entry" }
-  ]
+  // 7.0 in every skill – updated June/July
+  "70-every": RULES_70_EVERY
 };
 
 /* -------------------------------------------------------
@@ -229,13 +292,8 @@ $("go").addEventListener("click",()=>{
   const O = overallFrom(L,R,W,S);
   const scores={L,R,W,S,O};
 
-  // Resolve rule aliasing (some menu items share the same rules)
   const sel = $("target").value;
-  let rules = RULES[sel];
-  if(!Array.isArray(rules) && typeof rules === "string"){
-    rules = RULES[rules];
-  }
-
+  const rules = RULES[sel];
   const match = rules.find(r=>r.test(scores));
 
   if(match){
