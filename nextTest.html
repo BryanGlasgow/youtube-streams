@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Next Livestream</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<!-- PT Sans -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&display=swap" rel="stylesheet">
+
+<style>
+  :root { color-scheme: light; }
+  body { margin:0; background:#fff; font-family:'PT Sans', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; }
+  .container { max-width: 720px; margin: 0 auto; padding: 1rem; }
+
+  .stream { border:1px solid #ddd; border-radius:6px; overflow:hidden; background:#fff; }
+  .stream a { color: inherit; text-decoration: none; }
+
+  .stream img { width:100%; display:block; aspect-ratio:16/9; object-fit:cover; object-position:center; }
+
+  .content { padding: .75rem; }
+  .title { font-weight:700; margin-bottom:.25rem; }
+  .date { font-size:.9rem; color:#555; }
+
+  .countdown { margin-top:.25rem; font-size:.95rem; font-weight:700; color:#333; }
+  .countdown.live { color:#cc0000; }
+
+  .description { margin-top:.5rem; font-size:.9rem; color:#000; }
+  .description a { color:#005398; text-decoration:none; }
+  .description a:hover { text-decoration:underline; }
+
+  .calendar { margin-top:.5rem; font-size:.85rem; }
+  .calendar a { margin-right:.75rem; color:#005398; text-decoration:none; }
+  .calendar a:hover { text-decoration:underline; }
+
+  .watch-live { margin-top:.75rem; }
+  .watch-live a {
+    display:inline-block; background:#cc0000; color:#fff; padding:.5rem .75rem;
+    border-radius:3px; font-weight:700; text-decoration:none;
+  }
+  .watch-live a:hover { background:#a30000; }
+
+  .none { font-style: italic; color:#666; }
+</style>
+</head>
+<body>
+  <div class="container">
+    <div id="nextEventOutput">Loading next livestream…</div>
+  </div>
+
+  <!-- Shared data layer (must be at the **same path** as this file) -->
+  <script src="./yt-shared.js"></script>
+
+  <script>
+    /* ======= SETTINGS (match your earlier widget) ======= */
+    const TIMEZONE = "Europe/London";
+    const DESCRIPTION_LIMIT = 200;
+    const CHANNEL_ID = "UC7Do00lxLh7l4WwXLl96P5A"; // for "Subscribe" CTA
+
+    /* ======= UTILITIES ======= */
+    function formatUKDate(iso) {
+      return new Date(iso).toLocaleString("en-GB", {
+        dateStyle:"medium",
+        timeStyle:"short",
+        timeZone: TIMEZONE
+      });
+    }
+
+    function truncate(text, max) {
+      if (!text) return "";
+      return text.length > max ? text.substring(0, max) + "…" : text;
+    }
+
+    function calendarLinks(title, startISO, videoId) {
+      const start = new Date(startISO);
+      const end   = new Date(start.getTime() + 60 * 60 * 1000);
+
+      const iso = d => d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+
+      const ics =
+`BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+DTSTART:${iso(start)}
+DTEND:${iso(end)}
+SUMMARY:${title}
+URL:https://www.youtube.com/watch?v=${videoId}
+END:VEVENT
+END:VCALENDAR`;
+
+      const icsBlob = new Blob([ics], { type: "text/calendar" });
+      const icsUrl  = URL.createObjectURL(icsBlob);
+
+      const google =
+        "https://www.google.com/calendar/render?action=TEMPLATE" +
+        `&text=${encodeURIComponent(title)}` +
+        `&dates=${iso(start)}/${iso(end)}` +
+        `&details=${encodeURIComponent("Watch on YouTube")}` +
+        `&location=${encodeURIComponent("YouTube")}`;
+
+      return `
+        <a href="${google}" target="_blank" rel="noopener">Add to Google Calendar</a>
+        <a href="${icsUrl}" download="livestream.ics">Add to Outlook / Apple Calendar</a>
+        <a href="https://www.youtube.com/channel/${CHANNEL_ID}?sub_confirmation=1" target="_blank" rel="noopener">Subscribe to YouTube Channel</a>
+      `;
+    }
+
+    /* ======= ZERO-POLLING COUNTDOWN / LIVE STATE ======= */
+    function startCountdown(startISO, countdownEl, calendarEl, watchLiveEl) {
+      const startTime = new Date(startISO);
+
+      function update() {
+        const now = new Date();
+        if (now >= startTime) {
+          countdownEl.textContent = "LIVE NOW";
+          countdownEl.classList.add("live");
+          if (calendarEl) calendarEl.style.display = "none";
+          if (watchLiveEl) watchLiveEl.style.display = "block";
+          return;
+        }
+
+        const diff = startTime - now;
+        const mins = Math.floor(diff / 60000);
+        const hrs  = Math.floor(mins / 60);
+        const days = Math.floor(hrs / 24);
+
+        let text;
+        if (days > 0)      text = `Starts in ${days} day${days !== 1 ? "s" : ""}`;
+        else if (hrs > 0)  text = `Starts in ${hrs} hour${hrs !== 1 ? "s" : ""}`;
+        else               text = `Starts in ${mins} minute${mins !== 1 ? "s" : ""}`;
+
+        countdownEl.textContent = text;
+      }
+
+      update();
+      setInterval(update, 60000);
+    }
+
+    /* ======= RENDER ======= */
+    function renderNext(event) {
+      const container = document.getElementById("nextEventOutput");
+      if (!event) {
+        container.innerHTML = `<p class="none">No livestreams available.</p>`;
+        return;
+      }
+
+      const videoId     = event.id;
+      const title       = event.title;
+      const description = event.description || "";
+      const startIso    = event.scheduledStartTime || event.actualStartTime;
+      const thumbSrc    = `https://i.ytimg.com/vi/${videoId}/hq720.jpg`;
+
+      container.innerHTML = `
+        <div class="stream">
+          <a href="https://www.youtube.com/watch?v=${videoId}" target="_blank" rel="noopener">
+            <img src="${thumbSrc}" alt="">
+          </a>
+
+          <div class="content">
+            <div class="title">${title}</div>
+            <div class="date">${formatUKDate(startIso)} (UK time)</div>
+            <div class="countdown" id="countdown"></div>
+
+            <div class="description" id="desc">
+              ${
+                description.length > DESCRIPTION_LIMIT
+                  ? `
+                    <span id="shortDesc">${truncate(description, DESCRIPTION_LIMIT)}</span>
+                    <span id="fullDesc" style="display:none">${description}</span>
+                    <a href="#" id="toggleDesc">Show more</a>
+                  `
+                  : description
+              }
+            </div>
+
+            <div class="calendar" id="calendar">
+              ${calendarLinks(title, startIso, videoId)}
+            </div>
+
+            <div class="watch-live" id="watchLive" style="display:none">
+              <a href="https://www.youtube.com/watch?v=${videoId}&live_chat=1" target="_blank" rel="noopener">
+                ▶ Watch live on YouTube
+              </a>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Hook up countdown (zero polling)
+      const countdownEl = document.getElementById("countdown");
+      const calendarEl  = document.getElementById("calendar");
+      const watchLiveEl = document.getElementById("watchLive");
+      startCountdown(startIso, countdownEl, calendarEl, watchLiveEl);
+
+      // Description toggle
+      const toggle = document.getElementById("toggleDesc");
+      if (toggle) {
+        const shortEl = document.getElementById("shortDesc");
+        const fullEl  = document.getElementById("fullDesc");
+        toggle.addEventListener("click", (e) => {
+          e.preventDefault();
+          const expanded = fullEl.style.display === "inline";
+          if (expanded) {
+            fullEl.style.display  = "none";
+            shortEl.style.display = "inline";
+            toggle.textContent    = "Show more";
+          } else {
+            fullEl.style.display  = "inline";
+            shortEl.style.display = "none";
+            toggle.textContent    = "Show less";
+          }
+        });
+      }
+    }
+
+    /* ======= BOOT ======= */
+    YTShared.getSharedData()
+      .then(data => renderNext(data.next))
+      .catch(() => {
+        document.getElementById("nextEventOutput").innerHTML =
+          `
+    <iframe 
+      src="https://www.youtube.com/embed/uT2MKPsYWNM?si=hA1Nb1VESosRijYB"
+      style="width:100%; height:360px; border:0;"
+      allowfullscreen>
+    </iframe>
+`;
+      });
+  </script>
+</body>
+</html>
