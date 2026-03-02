@@ -220,7 +220,13 @@ END:VCALENDAR`;
       .then(data => renderNext(data.next))
       .catch(() => {
         document.getElementById("nextEventOutput").innerHTML =
-          `<p class="none">Sorry — there was a problem loading the next livestream.</p>`;
+          `
+    <iframe 
+      src="https://www.youtube.com/embed/uT2MKPsYWNM?si=hA1Nb1VESosRijYB"
+      style="width:100%; height:360px; border:0;"
+      allowfullscreen>
+    </iframe>
+`;
       });
   </script>
 </body>
