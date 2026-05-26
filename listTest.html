@@ -12,37 +12,85 @@
 
 <style>
   :root { color-scheme: light; }
-  body { margin:0; background:#fff; font-family:'PT Sans', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; }
-  .wrap { padding: 1rem; }
 
-  h3 { margin: 1.25rem 0 .5rem; font-size:1.25rem; }
+  body {
+    margin:0;
+    background:#fff;
+    font-family:'PT Sans', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  }
+
+  .wrap {
+    padding: 1rem;
+  }
+
+  h3 {
+    margin: 1.25rem 0 .5rem;
+    font-size:1.25rem;
+  }
+
   .stream-list {
     display:grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap:1rem;
     margin-bottom: 1rem;
   }
+
   .stream-card {
-    border:1px solid #ddd; border-radius:4px; overflow:hidden;
-    display:block; text-decoration:none; color:#000; background:#fafafa;
+    border:1px solid #ddd;
+    border-radius:4px;
+    overflow:hidden;
+    display:block;
+    text-decoration:none;
+    color:#000;
+    background:#fafafa;
   }
-  .thumb { width:100%; display:block; }
-  .stream-card-content { padding:.75rem; }
-  .stream-card-title { font-weight:700; margin-bottom:.25rem; }
-  .stream-card-date { font-size:.85rem; color:#555; }
+
+  .thumb {
+    width:100%;
+    display:block;
+  }
+
+  .stream-card-content {
+    padding:.75rem;
+  }
+
+  .stream-card-title {
+    font-weight:700;
+    margin-bottom:.25rem;
+  }
+
+  .stream-card-date {
+    font-size:.85rem;
+    color:#555;
+  }
 
   /* Compact CTA row under upcoming cards */
   .cta-row {
-    display:flex; align-items:center; gap:.75rem;
+    display:flex;
+    align-items:center;
+    gap:.75rem;
     padding:.5rem .75rem .75rem;
   }
-  .cta-row a {
-    display:inline-block; font-size:.85rem; color:#005398; text-decoration:none;
-  }
-  .cta-row a:hover { text-decoration:underline; }
-  .cta-sep { color:#bbb; }
 
-  .message { color:#555; padding:.5rem 0; }
+  .cta-row a {
+    display:inline-block;
+    font-size:.85rem;
+    color:#005398;
+    text-decoration:none;
+  }
+
+  .cta-row a:hover {
+    text-decoration:underline;
+  }
+
+  .cta-sep {
+    color:#bbb;
+  }
+
+  .message {
+    color:#555;
+    padding:.5rem 0;
+  }
 
   .youtube-btn {
     display: inline-block;
@@ -60,27 +108,69 @@
   .youtube-btn:hover {
     background-color: #002060;
   }
+
+  /* =========================================
+     Hide Upcoming section when switched off
+  ========================================= */
+
+  .hide-upcoming #upcoming-section {
+    display: none;
+  }
+
 </style>
+
+<script>
+
+  /* =========================================
+     SWITCH
+     true  = show Upcoming + Previous
+     false = show Previous only
+  ========================================= */
+
+  const SHOW_UPCOMING = false;
+
+  if (!SHOW_UPCOMING) {
+    document.documentElement.classList.add("hide-upcoming");
+  }
+
+</script>
+
 </head>
 
 <body>
+
   <div class="wrap">
 
-    <h3 id="upcoming-heading">Upcoming Events</h3>
-    <p id="upcoming-text">
-      Connect with the postgraduate degrees that interest you through our upcoming live events. Meet our expert academics and current students, and ask them your questions about postgraduate life and study in Glasgow.
-      Choose an event and click "Notify me" to get a reminder when it goes live.
-    </p>
+    <!-- =====================================
+         UPCOMING EVENTS
+    ====================================== -->
 
-    <div id="upcoming" class="stream-list"></div>
+    <div id="upcoming-section">
+
+      <h3>Upcoming Events</h3>
+
+      <p>
+        Connect with the postgraduate degrees that interest you through our upcoming live events. Meet our expert academics and current students, and ask them your questions about postgraduate life and study in Glasgow.
+        Choose an event and click "Notify me" to get a reminder when it goes live.
+      </p>
+
+      <div id="upcoming" class="stream-list"></div>
+
+    </div>
+
+    <!-- =====================================
+         PREVIOUS EVENTS
+    ====================================== -->
 
     <h3>Previous Events</h3>
+
     <p>
       Catch up with the recordings of our live panel discussion and Q&A events. Hear from our current students as they share their experiences of postgraduate study, and answer viewer questions.
       It’s a great way to learn more about our postgraduate degrees in Arts & Humanities.
     </p>
 
     <div id="past" class="stream-list"></div>
+
   </div>
 
   <!-- Shared data layer -->
@@ -88,30 +178,29 @@
 
   <script>
 
-    /* =========================================
-       SWITCH
-       true  = show Upcoming + Previous
-       false = show Previous only
-    ========================================= */
-    const SHOW_UPCOMING = false;
-
     const TIMEZONE = "Europe/London";
 
     function formatUKDate(iso) {
+
       return new Date(iso).toLocaleString("en-GB", {
         dateStyle:"medium",
         timeStyle:"short",
         timeZone: TIMEZONE
       });
+
     }
 
-    /* ---- Calendar helpers (Google + ICS) ---- */
+    /* =========================================
+       Calendar helpers (Google + ICS)
+    ========================================= */
 
     function toIcsStamp(d) {
+
       return new Date(d)
         .toISOString()
         .replace(/[-:]/g, "")
         .split(".")[0] + "Z";
+
     }
 
     function buildCalendarCta(container, title, startISO, videoId) {
@@ -119,7 +208,8 @@
       const start = new Date(startISO);
       const end   = new Date(start.getTime() + 60 * 60 * 1000);
 
-      // Google Calendar URL
+      /* Google Calendar URL */
+
       const gURL =
         "https://www.google.com/calendar/render?action=TEMPLATE" +
         `&text=${encodeURIComponent(title)}` +
@@ -127,7 +217,8 @@
         `&details=${encodeURIComponent("Watch on YouTube")}` +
         `&location=${encodeURIComponent("YouTube")}`;
 
-      // ICS
+      /* ICS */
+
       const ics =
 `BEGIN:VCALENDAR
 VERSION:2.0
@@ -165,9 +256,12 @@ END:VCALENDAR`;
       row.appendChild(aIcs);
 
       container.appendChild(row);
+
     }
 
-    /* ---- Card renderers ---- */
+    /* =========================================
+       Card renderer
+    ========================================= */
 
     function card(v, dateIso, addCalendar = false) {
 
@@ -185,22 +279,28 @@ END:VCALENDAR`;
       const card = document.createElement("div");
       card.className = "stream-card";
 
-      // Thumbnail link
+      /* Thumbnail link */
+
       const link = document.createElement("a");
+
       link.href = `https://www.youtube.com/watch?v=${id}`;
       link.target = "_blank";
       link.rel = "noopener";
 
       const img = document.createElement("img");
+
       img.className = "thumb";
       img.src = thumb;
       img.alt = "";
 
       link.appendChild(img);
+
       card.appendChild(link);
 
-      // Content
+      /* Content */
+
       const content = document.createElement("div");
+
       content.className = "stream-card-content";
 
       content.innerHTML = `
@@ -210,15 +310,19 @@ END:VCALENDAR`;
 
       card.appendChild(content);
 
-      // Calendar CTA (upcoming only)
+      /* Calendar CTA (upcoming only) */
+
       if (addCalendar) {
         buildCalendarCta(card, title, dateIso, id);
       }
 
       return card;
+
     }
 
-    /* ---- Page rendering ---- */
+    /* =========================================
+       Page rendering
+    ========================================= */
 
     function renderLists(data) {
 
@@ -228,9 +332,9 @@ END:VCALENDAR`;
       upEl.innerHTML = "";
       psEl.innerHTML = "";
 
-      /* ==========================
+      /* =====================================
          UPCOMING EVENTS
-      ========================== */
+      ===================================== */
 
       if (SHOW_UPCOMING) {
 
@@ -251,18 +355,11 @@ END:VCALENDAR`;
 
         }
 
-      } else {
-
-        // Hide upcoming section completely
-        document.getElementById("upcoming-heading").style.display = "none";
-        document.getElementById("upcoming-text").style.display = "none";
-        upEl.style.display = "none";
-
       }
 
-      /* ==========================
+      /* =====================================
          PREVIOUS EVENTS
-      ========================== */
+      ===================================== */
 
       if (!data.past || !data.past.length) {
 
@@ -284,9 +381,12 @@ END:VCALENDAR`;
         });
 
       }
+
     }
 
-    /* ---- Load shared data ---- */
+    /* =========================================
+       Load shared data
+    ========================================= */
 
     YTShared.getSharedData()
 
@@ -310,5 +410,6 @@ END:VCALENDAR`;
       });
 
   </script>
+
 </body>
 </html>
