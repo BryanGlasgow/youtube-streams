@@ -31,9 +31,10 @@
   .stream-card-title { font-weight:700; margin-bottom:.25rem; }
   .stream-card-date { font-size:.85rem; color:#555; }
 
+  /* Compact CTA row under upcoming cards */
   .cta-row {
     display:flex; align-items:center; gap:.75rem;
-    padding:.5rem .75rem .75rem;
+    padding:.5rem .75rem .75rem; /* a bit tighter */
   }
   .cta-row a {
     display:inline-block; font-size:.85rem; color:#005398; text-decoration:none;
@@ -59,22 +60,21 @@
 .youtube-btn:hover {
     background-color: #002060;
 }
+  
 </style>
 </head>
 <body>
   <div class="wrap">
     <h3>Upcoming Events</h3>
-    <p>
-      Connect with the postgraduate degrees that interest you through our upcoming live events. Meet our expert academics and current students, and ask them your questions about postgraduate life and study in Glasgow. 
-      Choose an event and click "Notify me" to get a reminder when it goes live.
-    </p>
+    <p>Connect with the postgraduate degrees that interest you through our upcoming live events. Meet our expert academics and current students, and ask them your questions about postgraduate life and study in Glasgow. 
+Choose an event and click "Notify me" to get a reminder when it goes live.
+</p>
     <div id="upcoming" class="stream-list"></div>
 
-    <h3>Recent Events</h3>
-    <p>
-      Catch up with the recordings of our live panel discussion and Q&amp;A events. Hear from our current students as they share their experiences of postgraduate study, and answer viewer questions.
-      It’s a great way to learn more about our postgraduate degrees in Arts &amp; Humanities.  
-    </p>
+    <h3>Previous Events</h3>
+    <p>Catch up with the recordings of our live panel discussion and Q&A events. Hear from our current students as they share their experiences of postgraduate study, and answer viewer questions.
+It’s a great way to learn more about our postgraduate degrees in Arts & Humanities.  
+</p>
     <div id="past" class="stream-list"></div>
   </div>
 
@@ -84,16 +84,15 @@
   <script>
     const TIMEZONE = "Europe/London";
 
-    // ✅ SWITCH (change true/false as needed)
-    const SHOW_PAST_ONLY = true;
-
     function formatUKDate(iso) {
       return new Date(iso).toLocaleString("en-GB", {
         dateStyle:"medium", timeStyle:"short", timeZone: TIMEZONE
       });
     }
 
+    /* ---- Calendar helpers (Google + ICS) ---- */
     function toIcsStamp(d) {
+      // UTC Zulu, strip milliseconds & separators per iCalendar
       return new Date(d).toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
     }
 
@@ -101,6 +100,7 @@
       const start = new Date(startISO);
       const end   = new Date(start.getTime() + 60 * 60 * 1000);
 
+      // Google Calendar URL
       const gURL =
         "https://www.google.com/calendar/render?action=TEMPLATE" +
         `&text=${encodeURIComponent(title)}` +
@@ -108,6 +108,7 @@
         `&details=${encodeURIComponent("Watch on YouTube")}` +
         `&location=${encodeURIComponent("YouTube")}`;
 
+      // ICS (Outlook / Apple) – generate a Blob so download works cleanly
       const ics =
 `BEGIN:VCALENDAR
 VERSION:2.0
@@ -118,7 +119,6 @@ SUMMARY:${title}
 URL:https://www.youtube.com/watch?v=${videoId}
 END:VEVENT
 END:VCALENDAR`;
-
       const icsBlob = new Blob([ics], { type: "text/calendar" });
       const icsURL  = URL.createObjectURL(icsBlob);
 
@@ -147,6 +147,9 @@ END:VCALENDAR`;
       container.appendChild(row);
     }
 
+    /* ---- Card renderers ---- */
+
+    // Base card for either upcoming or past; pass addCalendar=true for upcoming
     function card(v, dateIso, addCalendar=false) {
       const id    = v.id;
       const title = v.title;
@@ -156,6 +159,7 @@ END:VCALENDAR`;
         || (t.default && t.default.url)
         || `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 
+      // Card root (link wraps thumbnail only; content remains clickable text)
       const card = document.createElement("div");
       card.className = "stream-card";
 
@@ -180,41 +184,33 @@ END:VCALENDAR`;
       card.appendChild(content);
 
       if (addCalendar) {
+        // Compact calendar CTA sits under the content block
         buildCalendarCta(card, title, dateIso, id);
       }
 
       return card;
     }
 
+    /* ---- Page rendering ---- */
     function renderLists(data) {
       const upEl = document.getElementById("upcoming");
       const psEl = document.getElementById("past");
       upEl.innerHTML = ""; psEl.innerHTML = "";
 
-      // ✅ Hide upcoming if switch is on
-      if (SHOW_PAST_ONLY) {
-        upEl.innerHTML = "";
-
-        // ✅ OPTIONAL tidy-up: hide heading + paragraph
-        const upHeading = upEl.previousElementSibling.previousElementSibling;
-        const upPara    = upEl.previousElementSibling;
-
-        if (upHeading) upHeading.style.display = "none";
-        if (upPara) upPara.style.display = "none";
+      if (!data.upcoming || !data.upcoming.length) {
+        upEl.innerHTML = `<div class="message">We regularly add new events. Please check back soon.</div>`;
       } else {
-        if (!data.upcoming || !data.upcoming.length) {
-          upEl.innerHTML = `<div class="message">We regularly add new events. Please check back soon.</div>`;
-        } else {
-          data.upcoming.forEach(v => {
-            upEl.appendChild(card(v, v.scheduledStartTime, true));
-          });
-        }
+        data.upcoming.forEach(v => {
+          // Upcoming: show calendar CTA; date = scheduled start
+          upEl.appendChild(card(v, v.scheduledStartTime, true));
+        });
       }
 
       if (!data.past || !data.past.length) {
         psEl.innerHTML = `<div class="message">No previous events found.</div>`;
       } else {
         data.past.forEach(v => {
+          // Past: no calendar CTA; date = actual start (fallback scheduled)
           psEl.appendChild(card(v, v.actualStartTime || v.scheduledStartTime, false));
         });
       }
@@ -222,11 +218,16 @@ END:VCALENDAR`;
 
     YTShared.getSharedData()
       .then(renderLists)
-      .catch(() => {
-        document.getElementById("upcoming").innerHTML = `
-          <a class="youtube-btn" 
-             href="https://www.youtube.com/playlist?list=PLchy_nZQAZtAIkcBQ3sMEQgLfoFyId("past").innerHTML = "";
-      });
+.catch(() => {
+  document.getElementById("upcoming").innerHTML = `
+    <a class="youtube-btn" 
+       href="https://www.youtube.com/playlist?list=PLchy_nZQAZtAIkcBQ3sMEQgLfoF48-FiV">
+      <strong>See the Full Playlist on YouTube ></strong>
+    </a>
+  `;
+
+  document.getElementById("past").innerHTML = "";
+});
   </script>
 </body>
 </html>
