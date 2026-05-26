@@ -118,21 +118,10 @@
   <div class="wrap">
 
     <!-- =====================================
-         UPCOMING EVENTS
+         UPCOMING EVENTS CONTAINER
     ====================================== -->
 
-    <div id="upcoming-section" style="display:none;">
-
-      <h3>Upcoming Events</h3>
-
-      <p>
-        Connect with the postgraduate degrees that interest you through our upcoming live events. Meet our expert academics and current students, and ask them your questions about postgraduate life and study in Glasgow.
-        Choose an event and click "Notify me" to get a reminder when it goes live.
-      </p>
-
-      <div id="upcoming" class="stream-list"></div>
-
-    </div>
+    <div id="upcoming-container"></div>
 
     <!-- =====================================
          PREVIOUS EVENTS
@@ -162,8 +151,25 @@
 
     const SHOW_UPCOMING = false;
 
+    /* =========================================
+       Render Upcoming HTML only if enabled
+    ========================================= */
+
     if (SHOW_UPCOMING) {
-      document.getElementById("upcoming-section").style.display = "block";
+
+      document.getElementById("upcoming-container").innerHTML = `
+
+        <h3>Upcoming Events</h3>
+
+        <p>
+          Connect with the postgraduate degrees that interest you through our upcoming live events. Meet our expert academics and current students, and ask them your questions about postgraduate life and study in Glasgow.
+          Choose an event and click "Notify me" to get a reminder when it goes live.
+        </p>
+
+        <div id="upcoming" class="stream-list"></div>
+
+      `;
+
     }
 
     const TIMEZONE = "Europe/London";
@@ -314,17 +320,15 @@ END:VCALENDAR`;
 
     function renderLists(data) {
 
-      const upEl = document.getElementById("upcoming");
+      const upEl = SHOW_UPCOMING
+        ? document.getElementById("upcoming")
+        : null;
+
       const psEl = document.getElementById("past");
 
-      upEl.innerHTML = "";
-      psEl.innerHTML = "";
-
-      /* =====================================
-         UPCOMING EVENTS
-      ===================================== */
-
       if (SHOW_UPCOMING) {
+
+        upEl.innerHTML = "";
 
         if (!data.upcoming || !data.upcoming.length) {
 
@@ -348,6 +352,8 @@ END:VCALENDAR`;
       /* =====================================
          PREVIOUS EVENTS
       ===================================== */
+
+      psEl.innerHTML = "";
 
       if (!data.past || !data.past.length) {
 
