@@ -65,6 +65,7 @@
   }
 
   /* Compact CTA row under upcoming cards */
+
   .cta-row {
     display:flex;
     align-items:center;
@@ -109,32 +110,7 @@
     background-color: #002060;
   }
 
-  /* =========================================
-     Hide Upcoming section when switched off
-  ========================================= */
-
-  .hide-upcoming #upcoming-section {
-    display: none;
-  }
-
 </style>
-
-<script>
-
-  /* =========================================
-     SWITCH
-     true  = show Upcoming + Previous
-     false = show Previous only
-  ========================================= */
-
-  const SHOW_UPCOMING = false;
-
-  if (!SHOW_UPCOMING) {
-    document.documentElement.classList.add("hide-upcoming");
-  }
-
-</script>
-
 </head>
 
 <body>
@@ -145,7 +121,7 @@
          UPCOMING EVENTS
     ====================================== -->
 
-    <div id="upcoming-section">
+    <div id="upcoming-section" style="display:none;">
 
       <h3>Upcoming Events</h3>
 
@@ -177,6 +153,18 @@
   <script src="./yt-shared.js"></script>
 
   <script>
+
+    /* =========================================
+       SWITCH
+       true  = show Upcoming + Previous
+       false = show Previous only
+    ========================================= */
+
+    const SHOW_UPCOMING = false;
+
+    if (SHOW_UPCOMING) {
+      document.getElementById("upcoming-section").style.display = "block";
+    }
 
     const TIMEZONE = "Europe/London";
 
